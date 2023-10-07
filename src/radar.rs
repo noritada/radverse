@@ -1,26 +1,50 @@
 #[derive(Debug)]
-pub(crate) struct ObservationPoint {
+pub(crate) struct RadarSite {
+    pub(crate) lat_deg: f64,
+    pub(crate) alt_meter: f64,
+}
+
+#[derive(Debug)]
+pub(crate) struct RadarObsCell {
+    pub(crate) r_meter: f64,
+    pub(crate) el_deg: f64,
+}
+
+#[derive(Debug)]
+pub(crate) struct RadarCenteredPoint {
     pub(crate) alt_meter: f64,
     pub(crate) dist_meter: f64,
+}
+
+impl From<(&RadarObsCell, &RadarSite)> for RadarCenteredPoint {
+    fn from(value: (&RadarObsCell, &RadarSite)) -> Self {
+        let (cell, site) = value;
+        calc_altitude_and_distance_on_sphere(
+            cell.r_meter,
+            cell.el_deg,
+            site.lat_deg,
+            site.alt_meter,
+        )
+    }
 }
 
 // References:
 //
 // - https://docs.wradlib.org/en/stable/generated/wradlib.georef.misc.site_distance.html
 // - https://docs.wradlib.org/en/stable/generated/wradlib.georef.misc.bin_altitude.html
-pub(crate) fn calc_altitude_and_distance_on_sphere(
+fn calc_altitude_and_distance_on_sphere(
     r_meter: f64,
     el_deg: f64,
     lat_deg: f64,
     alt_meter: f64,
-) -> ObservationPoint {
+) -> RadarCenteredPoint {
     let el = el_deg.to_radians();
     let r_earth = calc_earth_radius(lat_deg);
     let r_eff = r_earth * 4_f64 / 3_f64;
     let sr = r_eff + alt_meter;
     let z = (r_meter * r_meter + sr * sr + r_meter * sr * 2_f64 * el.sin()).sqrt() - r_eff;
     let s = r_eff * ((r_meter * el.cos()) / (r_eff + z)).asin();
-    ObservationPoint {
+    RadarCenteredPoint {
         alt_meter: z,
         dist_meter: s,
     }

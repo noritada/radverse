@@ -10,6 +10,13 @@ pub(crate) struct RadarObsCell {
     pub(crate) el_deg: f64,
 }
 
+impl From<(&RadarCenteredPoint, &RadarSite)> for RadarObsCell {
+    fn from(value: (&RadarCenteredPoint, &RadarSite)) -> Self {
+        let (point, site) = value;
+        calc_altitude_and_distance_on_sphere_inverse(point, site)
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct RadarCenteredPoint {
     pub(crate) alt_meter: f64,
@@ -48,6 +55,27 @@ fn calc_altitude_and_distance_on_sphere(
         alt_meter: z,
         dist_meter: s,
     }
+}
+
+// Inverse function:
+// ```
+// X = (r_eff + z) * sin(s / r_eff)
+// Y = sqrt(z * z - X * X) - sr
+// X = r * cos(el)
+// Y = r * sin(el)
+// ```
+fn calc_altitude_and_distance_on_sphere_inverse(
+    point: &RadarCenteredPoint,
+    site: &RadarSite,
+) -> RadarObsCell {
+    let r_earth = calc_earth_radius(site.lat_deg);
+    let r_eff = r_earth * 4_f64 / 3_f64;
+    let sr = r_eff + site.alt_meter;
+    let x = (r_eff + point.alt_meter) * (point.dist_meter / r_eff).sin();
+    let y = (point.alt_meter * point.alt_meter - x * x).sqrt() - sr;
+    let r_meter = (x * x + y * y).sqrt();
+    let el_deg = y.atan2(x).to_degrees();
+    RadarObsCell { r_meter, el_deg }
 }
 
 pub(crate) const WGS84_RADIUS_EARTH_MAJOR: f64 = 6_378_137_f64;

@@ -1,13 +1,13 @@
 #[derive(Debug)]
-pub(crate) struct RadarSite {
-    pub(crate) lat_deg: f64,
-    pub(crate) alt_meter: f64,
+pub struct RadarSite {
+    pub lat_deg: f64,
+    pub alt_meter: f64,
 }
 
 #[derive(Debug)]
-pub(crate) struct RadarObsCell {
-    pub(crate) r_meter: f64,
-    pub(crate) el_deg: f64,
+pub struct RadarObsCell {
+    pub r_meter: f64,
+    pub el_deg: f64,
 }
 
 impl From<(&RadarCenteredPoint, &RadarSite)> for RadarObsCell {
@@ -18,9 +18,9 @@ impl From<(&RadarCenteredPoint, &RadarSite)> for RadarObsCell {
 }
 
 #[derive(Debug)]
-pub(crate) struct RadarCenteredPoint {
-    pub(crate) alt_meter: f64,
-    pub(crate) dist_meter: f64,
+pub struct RadarCenteredPoint {
+    pub alt_meter: f64,
+    pub dist_meter: f64,
 }
 
 impl From<(&RadarObsCell, &RadarSite)> for RadarCenteredPoint {

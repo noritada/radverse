@@ -1,3 +1,5 @@
+const HALF_PI: f64 = std::f64::consts::PI / 2.0;
+
 #[derive(Debug, PartialEq)]
 pub struct LatLonInDegrees(pub f64, pub f64);
 
@@ -62,6 +64,32 @@ impl From<&Xyz> for LatLonInRadians {
     }
 }
 
+fn compute_distance_from_great_circle_route<I1, I2>(
+    lats_rad: I1,
+    lons_rad: I2,
+    loc1: &LatLonInRadians,
+    loc2: &LatLonInRadians,
+) -> std::iter::Map<std::iter::Zip<I1, I2>, impl FnMut((f64, f64)) -> f64>
+where
+    I1: Iterator<Item = f64>,
+    I2: Iterator<Item = f64>,
+{
+    let lat_center = (loc1.0 + loc2.0) / 2.0;
+    let earth_radius = crate::earth::calc_earth_radius(lat_center);
+
+    let xyz1 = Xyz::from(loc1);
+    let xyz2 = Xyz::from(loc2);
+    let normal_vec = xyz1.unit_normal_vector(&xyz2);
+
+    lats_rad.zip(lons_rad).map(move |(lat, lon)| {
+        let xyz = Xyz::from(&LatLonInRadians(lat, lon));
+        let dot_product = normal_vec.dot_product(&xyz);
+        // arccos returns the angle between the normal vector and vector to the point
+        let distance_rad = dot_product.acos() - HALF_PI;
+        distance_rad * earth_radius
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -73,8 +101,6 @@ mod tests {
             }
         };
     }
-
-    const HALF_PI: f64 = std::f64::consts::PI / 2.0;
 
     macro_rules! test_xyz_to_lat_lon_rad {
         ($((
@@ -150,5 +176,26 @@ mod tests {
         let actual = Xyz(1., 1., 0.).dot_product(&Xyz(0., 1., 1.));
         let expected = 1.0;
         assert_eq!(actual, expected)
+    }
+
+    #[test]
+    fn computation_of_distance_from_great_circle_route() {
+        let lats = [35.0_f64, 36.0, 35.0, 36.0];
+        let lons = [140.0_f64, 140.0, 141.0, 141.0];
+        let loc1 = LatLonInDegrees(35.0, 140.0);
+        let loc2 = LatLonInDegrees(36.0, 141.0);
+        let actual_distances = compute_distance_from_great_circle_route(
+            lats.into_iter().map(|f| f.to_radians()),
+            lons.into_iter().map(|f| f.to_radians()),
+            &LatLonInRadians::from(&loc1),
+            &LatLonInRadians::from(&loc2),
+        )
+        .map(|d| d.abs())
+        .collect::<Vec<_>>();
+        let expected_distances = vec![0., 70_000., 70_000., 0.];
+        assert_almost_eq!(actual_distances[0], expected_distances[0], 1.0e+3);
+        assert_almost_eq!(actual_distances[1], expected_distances[1], 1.0e+4);
+        assert_almost_eq!(actual_distances[2], expected_distances[2], 1.0e+4);
+        assert_almost_eq!(actual_distances[3], expected_distances[3], 1.0e+3);
     }
 }

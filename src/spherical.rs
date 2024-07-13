@@ -64,15 +64,13 @@ impl From<&Xyz> for LatLonInRadians {
     }
 }
 
-fn compute_distance_from_great_circle_route<I1, I2>(
-    lats_rad: I1,
-    lons_rad: I2,
+fn compute_distance_from_great_circle_route<I>(
+    latlons: I,
     loc1: &LatLonInRadians,
     loc2: &LatLonInRadians,
-) -> std::iter::Map<std::iter::Zip<I1, I2>, impl FnMut((f64, f64)) -> f64>
+) -> std::iter::Map<I, impl FnMut(LatLonInRadians) -> f64>
 where
-    I1: Iterator<Item = f64>,
-    I2: Iterator<Item = f64>,
+    I: Iterator<Item = LatLonInRadians>,
 {
     let lat_center = (loc1.0 + loc2.0) / 2.0;
     let earth_radius = crate::earth::calc_earth_radius(lat_center);
@@ -81,8 +79,8 @@ where
     let xyz2 = Xyz::from(loc2);
     let normal_vec = xyz1.unit_normal_vector(&xyz2);
 
-    lats_rad.zip(lons_rad).map(move |(lat, lon)| {
-        let xyz = Xyz::from(&LatLonInRadians(lat, lon));
+    latlons.map(move |ll_rad| {
+        let xyz = Xyz::from(&ll_rad);
         let dot_product = normal_vec.dot_product(&xyz);
         // arccos returns the angle between the normal vector and vector to the point
         let distance_rad = dot_product.acos() - HALF_PI;
@@ -180,13 +178,18 @@ mod tests {
 
     #[test]
     fn computation_of_distance_from_great_circle_route() {
-        let lats = [35.0_f64, 36.0, 35.0, 36.0];
-        let lons = [140.0_f64, 140.0, 141.0, 141.0];
+        let latlons = [
+            (35.0_f64, 140.0_f64),
+            (36.0, 140.0),
+            (35.0, 141.0),
+            (36.0, 141.0),
+        ];
         let loc1 = LatLonInDegrees(35.0, 140.0);
         let loc2 = LatLonInDegrees(36.0, 141.0);
         let actual_distances = compute_distance_from_great_circle_route(
-            lats.into_iter().map(|f| f.to_radians()),
-            lons.into_iter().map(|f| f.to_radians()),
+            latlons
+                .into_iter()
+                .map(|(lat, lon)| LatLonInRadians::from(&LatLonInDegrees(lat, lon))),
             &LatLonInRadians::from(&loc1),
             &LatLonInRadians::from(&loc2),
         )

@@ -28,6 +28,33 @@ impl Xyz {
     fn norm(&self) -> f64 {
         (self.0 * self.0 + self.1 * self.1 + self.2 * self.2).sqrt()
     }
+
+    fn rotate_around_x_axis(&self, sin_theta: f64, cos_theta: f64) -> Self {
+        let Self(x, y, z) = &self;
+        Self(
+            *x,
+            y * cos_theta - z * sin_theta,
+            y * sin_theta + z * cos_theta,
+        )
+    }
+
+    fn rotate_around_y_axis(&self, sin_theta: f64, cos_theta: f64) -> Self {
+        let Self(x, y, z) = &self;
+        Self(
+            z * sin_theta + x * cos_theta,
+            *y,
+            z * cos_theta - x * sin_theta,
+        )
+    }
+
+    fn rotate_around_z_axis(&self, sin_theta: f64, cos_theta: f64) -> Self {
+        let Self(x, y, z) = &self;
+        Self(
+            x * cos_theta - y * sin_theta,
+            x * sin_theta + y * cos_theta,
+            *z,
+        )
+    }
 }
 
 impl From<&LatLonInRadians> for Xyz {
@@ -174,6 +201,37 @@ mod tests {
         let actual = Xyz(1., 1., 0.).dot_product(&Xyz(0., 1., 1.));
         let expected = 1.0;
         assert_eq!(actual, expected)
+    }
+
+    macro_rules! test_rotation {
+        ($((
+            $name:ident,
+            $origin:expr,
+            $op:ident,
+            $expected:expr
+        ),)*) => ($(
+            #[test]
+            fn $name() {
+                let theta = HALF_PI;
+                let actual = $origin.$op(theta.sin(), theta.cos());
+                let expected = $expected;
+                assert_almost_eq!(actual.0, expected.0, 1.0e-15);
+                assert_almost_eq!(actual.1, expected.1, 1.0e-15);
+                assert_almost_eq!(actual.2, expected.2, 1.0e-15);
+            }
+        )*);
+    }
+
+    test_rotation! {
+        (rotation_of_x_around_x_axis, Xyz(1., 0., 0.), rotate_around_x_axis, Xyz(1., 0., 0.)),
+        (rotation_of_y_around_x_axis, Xyz(0., 1., 0.), rotate_around_x_axis, Xyz(0., 0., 1.)),
+        (rotation_of_z_around_x_axis, Xyz(0., 0., 1.), rotate_around_x_axis, Xyz(0., -1., 0.)),
+        (rotation_of_x_around_y_axis, Xyz(1., 0., 0.), rotate_around_y_axis, Xyz(0., 0., -1.)),
+        (rotation_of_y_around_y_axis, Xyz(0., 1., 0.), rotate_around_y_axis, Xyz(0., 1., 0.)),
+        (rotation_of_z_around_y_axis, Xyz(0., 0., 1.), rotate_around_y_axis, Xyz(1., 0., 0.)),
+        (rotation_of_x_around_z_axis, Xyz(1., 0., 0.), rotate_around_z_axis, Xyz(0., 1., 0.)),
+        (rotation_of_y_around_z_axis, Xyz(0., 1., 0.), rotate_around_z_axis, Xyz(-1., 0., 0.)),
+        (rotation_of_z_around_z_axis, Xyz(0., 0., 1.), rotate_around_z_axis, Xyz(0., 0., 1.)),
     }
 
     #[test]

@@ -91,11 +91,14 @@ impl From<&Xyz> for LatLonInRadians {
     }
 }
 
-fn compute_distance_from_great_circle_route<I>(
+// Elements are `(phi, theta)` in meter.
+pub struct GreatCircleCoordinatePoint(pub f64, pub f64);
+
+pub fn project_to_great_circle_coordinate<I>(
     latlons: I,
     loc1: &LatLonInRadians,
     loc2: &LatLonInRadians,
-) -> std::iter::Map<I, impl FnMut(LatLonInRadians) -> f64>
+) -> std::iter::Map<I, impl FnMut(LatLonInRadians) -> GreatCircleCoordinatePoint>
 where
     I: Iterator<Item = LatLonInRadians>,
 {
@@ -106,12 +109,16 @@ where
     let xyz2 = Xyz::from(loc2);
     let normal_vec = xyz1.unit_normal_vector(&xyz2);
 
+    let LatLonInRadians(theta, phi) = LatLonInRadians::from(&normal_vec);
+    let theta = HALF_PI - theta; // from equator -> from north pole
+    let (theta, phi) = (-theta, -phi); // for inverse transformation
+
     latlons.map(move |ll_rad| {
-        let xyz = Xyz::from(&ll_rad);
-        let dot_product = normal_vec.dot_product(&xyz);
-        // arccos returns the angle between the normal vector and vector to the point
-        let distance_rad = dot_product.acos() - HALF_PI;
-        distance_rad * earth_radius
+        let xyz = Xyz::from(&ll_rad)
+            .rotate_around_z_axis(phi.sin(), phi.cos())
+            .rotate_around_y_axis(theta.sin(), theta.cos());
+        let LatLonInRadians(new_coord_lat, new_coord_lon) = LatLonInRadians::from(&xyz);
+        GreatCircleCoordinatePoint(new_coord_lon * earth_radius, new_coord_lat * earth_radius)
     })
 }
 
@@ -234,6 +241,30 @@ mod tests {
         (rotation_of_z_around_z_axis, Xyz(0., 0., 1.), rotate_around_z_axis, Xyz(0., 0., 1.)),
     }
 
+    fn distance_from_great_circle_route<I>(
+        latlons: I,
+        loc1: &LatLonInRadians,
+        loc2: &LatLonInRadians,
+    ) -> std::iter::Map<I, impl FnMut(LatLonInRadians) -> f64>
+    where
+        I: Iterator<Item = LatLonInRadians>,
+    {
+        let lat_center = (loc1.0 + loc2.0) / 2.0;
+        let earth_radius = crate::earth::calc_earth_radius(lat_center);
+
+        let xyz1 = Xyz::from(loc1);
+        let xyz2 = Xyz::from(loc2);
+        let normal_vec = xyz1.unit_normal_vector(&xyz2);
+
+        latlons.map(move |ll_rad| {
+            let xyz = Xyz::from(&ll_rad);
+            let dot_product = normal_vec.dot_product(&xyz);
+            // arccos returns the angle between the normal vector and vector to the point
+            let distance_rad = dot_product.acos() - HALF_PI;
+            distance_rad * earth_radius
+        })
+    }
+
     #[test]
     fn computation_of_distance_from_great_circle_route() {
         let latlons = [
@@ -244,7 +275,7 @@ mod tests {
         ];
         let loc1 = LatLonInDegrees(35.0, 140.0);
         let loc2 = LatLonInDegrees(36.0, 141.0);
-        let actual_distances = compute_distance_from_great_circle_route(
+        let actual_distances = distance_from_great_circle_route(
             latlons
                 .into_iter()
                 .map(|(lat, lon)| LatLonInRadians::from(&LatLonInDegrees(lat, lon))),
@@ -258,5 +289,55 @@ mod tests {
         assert_almost_eq!(actual_distances[1], expected_distances[1], 1.0e+4);
         assert_almost_eq!(actual_distances[2], expected_distances[2], 1.0e+4);
         assert_almost_eq!(actual_distances[3], expected_distances[3], 1.0e+3);
+    }
+
+    #[test]
+    fn projection_to_great_circle_coordinate() {
+        let latlons = [
+            (35.0_f64, 140.0_f64),
+            (36.0, 140.0),
+            (35.0, 141.0),
+            (36.0, 141.0),
+        ];
+        let loc1 = LatLonInDegrees(35.0, 140.0);
+        let loc2 = LatLonInDegrees(36.0, 141.0);
+        let new_coord_points = project_to_great_circle_coordinate(
+            latlons
+                .into_iter()
+                .map(|(lat, lon)| LatLonInRadians::from(&LatLonInDegrees(lat, lon))),
+            &LatLonInRadians::from(&loc1),
+            &LatLonInRadians::from(&loc2),
+        )
+        .collect::<Vec<_>>();
+        let actual_distances = new_coord_points
+            .iter()
+            .map(|GreatCircleCoordinatePoint(_, distance)| distance.abs())
+            .collect::<Vec<_>>();
+        let expected_distances = distance_from_great_circle_route(
+            latlons
+                .into_iter()
+                .map(|(lat, lon)| LatLonInRadians::from(&LatLonInDegrees(lat, lon))),
+            &LatLonInRadians::from(&loc1),
+            &LatLonInRadians::from(&loc2),
+        )
+        .map(|distance| distance.abs())
+        .collect::<Vec<_>>();
+        assert_almost_eq!(actual_distances[0], expected_distances[0], 1.0e-8);
+        assert_almost_eq!(actual_distances[1], expected_distances[1], 1.0e-8);
+        assert_almost_eq!(actual_distances[2], expected_distances[2], 1.0e-8);
+        assert_almost_eq!(actual_distances[3], expected_distances[3], 1.0e-8);
+
+        let component_values_along_cross_section = new_coord_points
+            .iter()
+            .map(|GreatCircleCoordinatePoint(x, _)| x)
+            .collect::<Vec<_>>();
+        let actual_distance_along_cross_section =
+            component_values_along_cross_section[3] - component_values_along_cross_section[0];
+        let expected_distance_along_cross_section = 140_000.;
+        assert_almost_eq!(
+            actual_distance_along_cross_section,
+            expected_distance_along_cross_section,
+            1.0e+4
+        );
     }
 }

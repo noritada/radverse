@@ -98,7 +98,10 @@ pub fn project_to_great_circle_coordinate<I>(
     latlons: I,
     loc1: &LatLonInRadians,
     loc2: &LatLonInRadians,
-) -> std::iter::Map<I, impl FnMut(LatLonInRadians) -> GreatCircleCoordinatePoint>
+) -> (
+    [f64; 2],
+    std::iter::Map<I, impl FnMut(LatLonInRadians) -> GreatCircleCoordinatePoint>,
+)
 where
     I: Iterator<Item = LatLonInRadians>,
 {
@@ -113,13 +116,24 @@ where
     let theta = HALF_PI - theta; // from equator -> from north pole
     let (theta, phi) = (-theta, -phi); // for inverse transformation
 
-    latlons.map(move |ll_rad| {
-        let xyz = Xyz::from(&ll_rad)
+    let project = move |xyz: &Xyz| {
+        let xyz = xyz
             .rotate_around_z_axis(phi.sin(), phi.cos())
             .rotate_around_y_axis(theta.sin(), theta.cos());
-        let LatLonInRadians(new_coord_lat, new_coord_lon) = LatLonInRadians::from(&xyz);
+        LatLonInRadians::from(&xyz)
+    };
+
+    let LatLonInRadians(_theta, phi1) = project(&xyz1);
+    let LatLonInRadians(_theta, phi2) = project(&xyz2);
+    let new_coord_latlons = latlons.map(move |ll_rad| {
+        let xyz = Xyz::from(&ll_rad);
+        let LatLonInRadians(new_coord_lat, new_coord_lon) = project(&xyz);
         GreatCircleCoordinatePoint(new_coord_lon * earth_radius, new_coord_lat * earth_radius)
-    })
+    });
+    (
+        [phi1 * earth_radius, phi2 * earth_radius],
+        new_coord_latlons,
+    )
 }
 
 #[cfg(test)]
@@ -301,16 +315,14 @@ mod tests {
         ];
         let loc1 = LatLonInDegrees(35.0, 140.0);
         let loc2 = LatLonInDegrees(36.0, 141.0);
-        let new_coord_points = project_to_great_circle_coordinate(
+        let (bounds, new_coord_points) = project_to_great_circle_coordinate(
             latlons
                 .into_iter()
                 .map(|(lat, lon)| LatLonInRadians::from(&LatLonInDegrees(lat, lon))),
             &LatLonInRadians::from(&loc1),
             &LatLonInRadians::from(&loc2),
-        )
-        .collect::<Vec<_>>();
+        );
         let actual_distances = new_coord_points
-            .iter()
             .map(|GreatCircleCoordinatePoint(_, distance)| distance.abs())
             .collect::<Vec<_>>();
         let expected_distances = distance_from_great_circle_route(
@@ -327,12 +339,7 @@ mod tests {
         assert_almost_eq!(actual_distances[2], expected_distances[2], 1.0e-8);
         assert_almost_eq!(actual_distances[3], expected_distances[3], 1.0e-8);
 
-        let component_values_along_cross_section = new_coord_points
-            .iter()
-            .map(|GreatCircleCoordinatePoint(x, _)| x)
-            .collect::<Vec<_>>();
-        let actual_distance_along_cross_section =
-            component_values_along_cross_section[3] - component_values_along_cross_section[0];
+        let actual_distance_along_cross_section = bounds[1] - bounds[0];
         let expected_distance_along_cross_section = 140_000.;
         assert_almost_eq!(
             actual_distance_along_cross_section,

@@ -136,6 +136,35 @@ where
     )
 }
 
+pub fn filtered_index_by_great_circle_coordinate<I>(
+    phi_bounds: &[f64; 2],
+    theta_threshold: f64,
+    points: I,
+) -> Vec<(usize, f64)>
+where
+    I: Iterator<Item = GreatCircleCoordinatePoint>,
+{
+    let phi_range = create_range(phi_bounds[0], phi_bounds[1]);
+    let mut filtered = points
+        .enumerate()
+        .filter_map(|(index, GreatCircleCoordinatePoint(phi, theta))| {
+            if !phi_range.contains(&phi) || theta.abs() > theta_threshold {
+                None
+            } else {
+                Some((index, phi - phi_range.start()))
+            }
+        })
+        .collect::<Vec<_>>();
+    // assuming that all phi values are not NaN
+    filtered.sort_by(|(_, phi_diff1), (_, phi_diff2)| phi_diff1.partial_cmp(phi_diff2).unwrap());
+    filtered
+}
+
+fn create_range(x1: f64, x2: f64) -> std::ops::RangeInclusive<f64> {
+    let [min, max] = if x1 <= x2 { [x1, x2] } else { [x2, x1] };
+    min..=max
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

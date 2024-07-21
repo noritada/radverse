@@ -91,10 +91,73 @@ impl From<&Xyz> for LatLonInRadians {
     }
 }
 
+pub struct Cell {
+    pub lat_rad: f64,
+    pub lon_rad: f64,
+    pub alt_min_meter: f64,
+    pub alt_max_meter: f64,
+}
+
+pub struct VerticalCrossSectionCell {
+    pub phi_meter: f64,
+    pub alt_min_meter: f64,
+    pub alt_max_meter: f64,
+}
+
+pub struct VerticalCrossSection {
+    cells: Vec<VerticalCrossSectionCell>,
+    phi_bounds: [f64; 2],
+}
+
+impl VerticalCrossSection {
+    fn new(cells: Vec<VerticalCrossSectionCell>, phi_bounds: [f64; 2]) -> Self {
+        Self { cells, phi_bounds }
+    }
+
+    pub fn from(
+        obs_cells: Vec<Cell>,
+        loc1: &LatLonInRadians,
+        loc2: &LatLonInRadians,
+        theta_threshold: f64,
+    ) -> Self {
+        let latlons = obs_cells.iter().map(
+            |Cell {
+                 lat_rad, lon_rad, ..
+             }| LatLonInRadians(*lat_rad, *lon_rad),
+        );
+        let (phi_bounds, points) = project_to_great_circle_coordinate(latlons, loc1, loc2);
+        let phis = filtered_index_by_great_circle_coordinate(&phi_bounds, theta_threshold, points);
+        let vertical_cells = phis
+            .iter()
+            .map(|(index, phi)| {
+                let Cell {
+                    alt_max_meter,
+                    alt_min_meter,
+                    ..
+                } = obs_cells[*index];
+                VerticalCrossSectionCell {
+                    phi_meter: *phi,
+                    alt_max_meter,
+                    alt_min_meter,
+                }
+            })
+            .collect::<Vec<_>>();
+        Self::new(vertical_cells, phi_bounds)
+    }
+
+    pub fn get(&self, phi: f64) -> Option<&VerticalCrossSectionCell> {
+        if !self.phi_bounds.contains(&phi) {
+            None
+        } else {
+            self.cells.iter().find(|cell| cell.phi_meter > phi)
+        }
+    }
+}
+
 // Elements are `(phi, theta)` in meter.
 pub struct GreatCircleCoordinatePoint(pub f64, pub f64);
 
-pub fn project_to_great_circle_coordinate<I>(
+fn project_to_great_circle_coordinate<I>(
     latlons: I,
     loc1: &LatLonInRadians,
     loc2: &LatLonInRadians,
@@ -136,7 +199,7 @@ where
     )
 }
 
-pub fn filtered_index_by_great_circle_coordinate<I>(
+fn filtered_index_by_great_circle_coordinate<I>(
     phi_bounds: &[f64; 2],
     theta_threshold: f64,
     points: I,

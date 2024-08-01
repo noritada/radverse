@@ -1,16 +1,34 @@
 #[derive(Debug)]
 pub struct RadarSite {
     pub lat_deg: f64,
+    pub lon_deg: f64,
     pub alt_meter: f64,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RadarObsCell {
+    pub r_meter: f64,
+    pub az_deg: f64,
+    pub el_deg: f64,
+}
+
+impl RadarObsCell {
+    pub fn new(r_meter: f64, az_deg: f64, el_deg: f64) -> Self {
+        Self {
+            r_meter,
+            az_deg,
+            el_deg,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct RadarObsCellVertical {
     pub r_meter: f64,
     pub el_deg: f64,
 }
 
-impl From<(&RadarCenteredPoint, &RadarSite)> for RadarObsCell {
+impl From<(&RadarCenteredPoint, &RadarSite)> for RadarObsCellVertical {
     fn from(value: (&RadarCenteredPoint, &RadarSite)) -> Self {
         let (point, site) = value;
         calc_altitude_and_distance_on_sphere_inverse(point, site)
@@ -23,8 +41,8 @@ pub struct RadarCenteredPoint {
     pub dist_meter: f64,
 }
 
-impl From<(&RadarObsCell, &RadarSite)> for RadarCenteredPoint {
-    fn from(value: (&RadarObsCell, &RadarSite)) -> Self {
+impl From<(&RadarObsCellVertical, &RadarSite)> for RadarCenteredPoint {
+    fn from(value: (&RadarObsCellVertical, &RadarSite)) -> Self {
         let (cell, site) = value;
         calc_altitude_and_distance_on_sphere(
             cell.r_meter,
@@ -67,7 +85,7 @@ fn calc_altitude_and_distance_on_sphere(
 fn calc_altitude_and_distance_on_sphere_inverse(
     point: &RadarCenteredPoint,
     site: &RadarSite,
-) -> RadarObsCell {
+) -> RadarObsCellVertical {
     let r_earth = crate::earth::calc_earth_radius(site.lat_deg.to_radians());
     let r_eff = r_earth * 4_f64 / 3_f64;
     let sr = r_eff + site.alt_meter;
@@ -75,5 +93,5 @@ fn calc_altitude_and_distance_on_sphere_inverse(
     let y = (point.alt_meter * point.alt_meter - x * x).sqrt() - sr;
     let r_meter = (x * x + y * y).sqrt();
     let el_deg = y.atan2(x).to_degrees();
-    RadarObsCell { r_meter, el_deg }
+    RadarObsCellVertical { r_meter, el_deg }
 }

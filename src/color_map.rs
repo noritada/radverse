@@ -1,3 +1,7 @@
+use std::str::FromStr;
+
+use itertools::Itertools;
+
 pub trait ColorMap {
     fn get_color(&self, value: f64) -> Option<&RgbColor>;
 }
@@ -12,6 +16,32 @@ pub struct RgbColor {
 impl RgbColor {
     pub fn new(red: u8, green: u8, blue: u8) -> Self {
         Self { red, green, blue }
+    }
+}
+
+impl FromStr for RgbColor {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        const MESSAGE: &str =
+            r##"color must be in specified in hexadecimal numbers like "#ffffff""##;
+
+        let mut chars = s.chars();
+        if s.len() != 7 || chars.next().unwrap() != '#' {
+            return Err(MESSAGE);
+        }
+        let chars: Option<Vec<_>> = chars.map(|c| c.to_digit(16)).collect();
+        let mut chars = chars
+            .ok_or_else(|| MESSAGE)?
+            .into_iter()
+            .map(|i| i as u8)
+            .tuples()
+            .map(|(a, b)| (a << 4) | b);
+        Ok(Self::new(
+            chars.next().unwrap(),
+            chars.next().unwrap(),
+            chars.next().unwrap(),
+        ))
     }
 }
 
@@ -42,6 +72,35 @@ impl ColorMap for ListedColorMap {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    macro_rules! test_parsing_rgb_color {
+        ($((
+            $name:ident,
+            $input:expr,
+            $expected:expr
+        ),)*) => ($(
+            #[test]
+            fn $name() {
+                let s = $input;
+                let actual = s.parse::<RgbColor>().ok();
+                let expected = $expected;
+                assert_eq!(actual, expected)
+            }
+        )*);
+    }
+
+    test_parsing_rgb_color! {
+        (
+            parsing_rgb_color_succeeds_with_numerical_chars,
+            "#012345", Some(RgbColor::new(0x01, 0x23, 0x45))
+        ),
+        (
+            parsing_rgb_color_succeeds_with_a_to_f_chars,
+            "#abcdef", Some(RgbColor::new(0xab, 0xcd, 0xef))
+        ),
+        (parsing_rgb_color_fails, "foobar!", None),
+        (parsing_rgb_color_fails_for_longer_text, "#ffffffff", None),
+    }
 
     #[test]
     fn listed_color_map() {

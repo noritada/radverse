@@ -91,6 +91,32 @@ impl From<&Xyz> for LatLonInRadians {
     }
 }
 
+// Transformation of the polar axis from z-axis to the axis defined.
+#[derive(Debug)]
+struct AxisTransformation {
+    theta: f64,
+    phi: f64,
+}
+
+impl AxisTransformation {
+    fn new(axis_vec: Xyz) -> Self {
+        let LatLonInRadians(theta, phi) = LatLonInRadians::from(&axis_vec);
+        let theta = HALF_PI - theta; // from equator -> from north pole
+        let (theta, phi) = (-theta, -phi); // for inverse transformation
+        Self { theta, phi }
+    }
+
+    fn transform(&self, xyz: &Xyz) -> Xyz {
+        xyz.rotate_around_z_axis(self.phi.sin(), self.phi.cos())
+            .rotate_around_y_axis(self.theta.sin(), self.theta.cos())
+    }
+
+    fn transform_inverse(&self, xyz: &Xyz) -> Xyz {
+        xyz.rotate_around_y_axis(-self.theta.sin(), self.theta.cos())
+            .rotate_around_z_axis(-self.phi.sin(), self.phi.cos())
+    }
+}
+
 pub struct Cell {
     pub lat_rad: f64,
     pub lon_rad: f64,
@@ -175,14 +201,9 @@ where
     let xyz2 = Xyz::from(loc2);
     let normal_vec = xyz1.unit_normal_vector(&xyz2);
 
-    let LatLonInRadians(theta, phi) = LatLonInRadians::from(&normal_vec);
-    let theta = HALF_PI - theta; // from equator -> from north pole
-    let (theta, phi) = (-theta, -phi); // for inverse transformation
-
+    let tx = AxisTransformation::new(normal_vec);
     let project = move |xyz: &Xyz| {
-        let xyz = xyz
-            .rotate_around_z_axis(phi.sin(), phi.cos())
-            .rotate_around_y_axis(theta.sin(), theta.cos());
+        let xyz = tx.transform(&xyz);
         LatLonInRadians::from(&xyz)
     };
 
@@ -353,6 +374,102 @@ mod tests {
         (rotation_of_x_around_z_axis, Xyz(1., 0., 0.), rotate_around_z_axis, Xyz(0., 1., 0.)),
         (rotation_of_y_around_z_axis, Xyz(0., 1., 0.), rotate_around_z_axis, Xyz(-1., 0., 0.)),
         (rotation_of_z_around_z_axis, Xyz(0., 0., 1.), rotate_around_z_axis, Xyz(0., 0., 1.)),
+    }
+
+    macro_rules! test_axis_transformation {
+        ($((
+            $name:ident,
+            $axis:expr,
+            $input:expr,
+            $op:ident,
+            $expected:expr
+        ),)*) => ($(
+            #[test]
+            fn $name() {
+                let tx = AxisTransformation::new($axis);
+                let input = $input;
+                let actual = tx.$op(&input);
+                let expected = $expected;
+                assert_almost_eq!(actual.0, expected.0, 1.0e-15);
+                assert_almost_eq!(actual.1, expected.1, 1.0e-15);
+                assert_almost_eq!(actual.2, expected.2, 1.0e-15);
+            }
+        )*);
+    }
+
+    test_axis_transformation! {
+        (
+            axis_transformation_of_x_using_x_axis,
+            Xyz(1., 0., 0.), Xyz(1., 0., 0.), transform, Xyz(0., 0., 1.)
+        ),
+        (
+            axis_transformation_of_y_using_x_axis,
+            Xyz(1., 0., 0.), Xyz(0., 1., 0.), transform, Xyz(0., 1., 0.)
+        ),
+        (
+            axis_transformation_of_z_using_x_axis,
+            Xyz(1., 0., 0.), Xyz(0., 0., 1.), transform, Xyz(-1., 0., 0.)
+        ),
+        (
+            axis_transformation_of_x_using_y_axis,
+            Xyz(0., 1., 0.), Xyz(1., 0., 0.), transform, Xyz(0., -1., 0.)
+        ),
+        (
+            axis_transformation_of_y_using_y_axis,
+            Xyz(0., 1., 0.), Xyz(0., 1., 0.), transform, Xyz(0., 0., 1.)
+        ),
+        (
+            axis_transformation_of_z_using_y_axis,
+            Xyz(0., 1., 0.), Xyz(0., 0., 1.), transform, Xyz(-1., 0., 0.)
+        ),
+        (
+            axis_transformation_of_x_using_z_axis,
+            Xyz(0., 0., 1.), Xyz(1., 0., 0.), transform, Xyz(1., 0., 0.)
+        ),
+        (
+            axis_transformation_of_y_using_z_axis,
+            Xyz(0., 0., 1.), Xyz(0., 1., 0.), transform, Xyz(0., 1., 0.)
+        ),
+        (
+            axis_transformation_of_z_using_z_axis,
+            Xyz(0., 0., 1.), Xyz(0., 0., 1.), transform, Xyz(0., 0., 1.)
+        ),
+        (
+            inverse_axis_transformation_of_x_using_x_axis,
+            Xyz(1., 0., 0.), Xyz(1., 0., 0.), transform_inverse, Xyz(0., 0., -1.)
+        ),
+        (
+            inverse_axis_transformation_of_y_using_x_axis,
+            Xyz(1., 0., 0.), Xyz(0., 1., 0.), transform_inverse, Xyz(0., 1., 0.)
+        ),
+        (
+            inverse_axis_transformation_of_z_using_x_axis,
+            Xyz(1., 0., 0.), Xyz(0., 0., 1.), transform_inverse, Xyz(1., 0., 0.)
+        ),
+        (
+            inverse_axis_transformation_of_x_using_y_axis,
+            Xyz(0., 1., 0.), Xyz(1., 0., 0.), transform_inverse, Xyz(0., 0., -1.)
+        ),
+        (
+            inverse_axis_transformation_of_y_using_y_axis,
+            Xyz(0., 1., 0.), Xyz(0., 1., 0.), transform_inverse, Xyz(-1., 0., 0.)
+        ),
+        (
+            inverse_axis_transformation_of_z_using_y_axis,
+            Xyz(0., 1., 0.), Xyz(0., 0., 1.), transform_inverse, Xyz(0., 1., 0.)
+        ),
+        (
+            inverse_axis_transformation_of_x_using_z_axis,
+            Xyz(0., 0., 1.), Xyz(1., 0., 0.), transform_inverse, Xyz(1., 0., 0.)
+        ),
+        (
+            inverse_axis_transformation_of_y_using_z_axis,
+            Xyz(0., 0., 1.), Xyz(0., 1., 0.), transform_inverse, Xyz(0., 1., 0.)
+        ),
+        (
+            inverse_axis_transformation_of_z_using_z_axis,
+            Xyz(0., 0., 1.), Xyz(0., 0., 1.), transform_inverse, Xyz(0., 0., 1.)
+        ),
     }
 
     fn distance_from_great_circle_route<I>(

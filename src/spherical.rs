@@ -55,6 +55,14 @@ impl Xyz {
             *z,
         )
     }
+
+    fn transform(&self, ax: &AxisTransformation) -> Self {
+        ax.transform(&self)
+    }
+
+    fn transform_inverse(&self, ax: &AxisTransformation) -> Self {
+        ax.transform_inverse(&self)
+    }
 }
 
 impl From<&LatLonInRadians> for Xyz {
@@ -203,7 +211,7 @@ where
 
     let tx = AxisTransformation::new(normal_vec);
     let project = move |xyz: &Xyz| {
-        let xyz = tx.transform(&xyz);
+        let xyz = xyz.transform(&tx);
         LatLonInRadians::from(&xyz)
     };
 

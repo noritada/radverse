@@ -1,4 +1,7 @@
-const HALF_PI: f64 = std::f64::consts::PI / 2.0;
+use std::f64::consts::PI;
+
+const HALF_PI: f64 = PI / 2.0;
+const TWO_PI: f64 = PI + PI;
 
 #[derive(Debug, PartialEq)]
 pub struct LatLonInDegrees(pub f64, pub f64);
@@ -255,6 +258,38 @@ where
 fn create_range(x1: f64, x2: f64) -> std::ops::RangeInclusive<f64> {
     let [min, max] = if x1 <= x2 { [x1, x2] } else { [x2, x1] };
     min..=max
+}
+
+/// Calculates distance and direction from `loc1` to `loc2` in radians.
+/// Direction is anti-clockwise from x axis.
+pub fn calc_distance_and_direction(loc1: &LatLonInRadians, loc2: &LatLonInRadians) -> (f64, f64) {
+    let xyz1 = Xyz::from(loc1);
+    let xyz2 = Xyz::from(loc2);
+    let normal_vec = xyz1.unit_normal_vector(&xyz2);
+
+    let tx = AxisTransformation::new(normal_vec);
+    let z_axis = Xyz(0., 0., 1.);
+    let LatLonInRadians(z_axis_coordp_lat, z_axis_coordp_lon) =
+        LatLonInRadians::from(&z_axis.transform(&tx));
+    let LatLonInRadians(_zero, loc1_coordp_lon) = LatLonInRadians::from(&xyz1.transform(&tx));
+    let LatLonInRadians(_zero, loc2_coordp_lon) = LatLonInRadians::from(&xyz2.transform(&tx));
+
+    let distance = loc2_coordp_lon - loc1_coordp_lon;
+    let distance = if distance < -PI {
+        distance + TWO_PI
+    } else if distance < PI {
+        distance
+    } else {
+        distance - TWO_PI
+    };
+
+    // Angle of a vector loc1->loc2 from parallel is equal to angle of z_axis_coordp
+    // from current z axis. So, calculate how z_axis_coordp is projected.
+    let z_axis_coordp_lon_rel = z_axis_coordp_lon - loc1_coordp_lon;
+    let xx = z_axis_coordp_lat.cos() * z_axis_coordp_lon_rel.sin();
+    let yy = z_axis_coordp_lat.sin();
+
+    (distance.abs(), xx.atan2(yy))
 }
 
 #[cfg(test)]
@@ -571,5 +606,56 @@ mod tests {
             expected_distance_along_cross_section,
             1.0e+4
         );
+    }
+
+    macro_rules! test_distance_and_direction_calculation {
+        ($((
+            $name:ident,
+            $loc1:expr,
+            $loc2:expr,
+            $expected_distance:expr,
+            $expected_direction:expr
+        ),)*) => ($(
+            #[test]
+            fn $name() {
+                let loc1 = $loc1;
+                let loc2 = $loc2;
+                let (distance, direction) = calc_distance_and_direction(
+                    &LatLonInRadians::from(&loc1),
+                    &LatLonInRadians::from(&loc2),
+                );
+
+                let lat_center = (loc1.0 + loc2.0) / 2.0;
+                let earth_radius = crate::earth::calc_earth_radius(lat_center);
+                let actual_distance = distance * earth_radius;
+                let actual_direction = direction.to_degrees();
+                assert_almost_eq!(actual_distance, $expected_distance, 1.0e+3);
+                assert_almost_eq!(actual_direction, $expected_direction, 1.0e+1);
+            }
+        )*);
+    }
+
+    test_distance_and_direction_calculation! {
+        (
+            distance_and_direction_calculation_for_the_same_loc,
+            LatLonInDegrees(0., 0.), LatLonInDegrees(0., 0.), 0., 0.
+        ),
+        (
+            distance_and_direction_calculation_along_equator,
+            LatLonInDegrees(0., 0.), LatLonInDegrees(0., 1.), 111_000., 0.
+        ),
+        (
+            distance_and_direction_calculation_along_prime_meridian,
+            LatLonInDegrees(0., 0.), LatLonInDegrees(1., 0.), 111_000., 90.
+        ),
+        (
+            distance_and_direction_calculation_along_parallel,
+            LatLonInDegrees(36., 140.), LatLonInDegrees(36., 141.),
+            111_000_f64 * 36_f64.to_radians().cos(), 0.
+        ),
+        (
+            distance_and_direction_calculation_along_meridian,
+            LatLonInDegrees(36., 140.), LatLonInDegrees(37., 140.), 111_000., 90.
+        ),
     }
 }

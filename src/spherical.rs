@@ -1,5 +1,9 @@
 use std::f64::consts::PI;
 
+use itertools::Itertools;
+
+use crate::{RadarCenteredPoint, RadarObsCell, RadarObsCellVertical, RadarSite};
+
 const HALF_PI: f64 = PI / 2.0;
 const TWO_PI: f64 = PI + PI;
 
@@ -125,6 +129,109 @@ impl AxisTransformation {
     fn transform_inverse(&self, xyz: &Xyz) -> Xyz {
         xyz.rotate_around_y_axis(-self.theta.sin(), self.theta.cos())
             .rotate_around_z_axis(-self.phi.sin(), self.phi.cos())
+    }
+}
+
+pub struct VerticalCrossSection2 {
+    pub cells: Vec<RadarObsCell>,
+    pub shape: (usize, usize),
+    pub max_distance_meter: f64,
+    pub max_alt_km: u8,
+}
+
+impl VerticalCrossSection2 {
+    pub fn new(
+        loc1: &LatLonInRadians,
+        loc2: &LatLonInRadians,
+        max_alt_km: u8,
+        (width, height): (usize, usize),
+        site: &RadarSite,
+    ) -> Self {
+        let earth_radius = crate::earth::calc_earth_radius(site.lat_deg.to_degrees());
+        let h_axis = VerticalCrossSectionHorizontalAxis::from(loc1, loc2, width, site);
+        let v_axis = VerticalCrossSectionVerticalAxis::from(max_alt_km, height);
+        let h_cells = h_axis.cells;
+        let VerticalCrossSectionVerticalAxis(v_cells) = v_axis;
+        let cells = v_cells
+            .iter()
+            .cartesian_product(h_cells.iter())
+            .map(|(&alt_meter, &(_phi, site_distance, site_direction))| {
+                let dist_meter = site_distance * earth_radius;
+                let cell = RadarCenteredPoint {
+                    alt_meter,
+                    dist_meter,
+                };
+                let cell = RadarObsCellVertical::from((&cell, site));
+                // convert "anti-clockwise from east" to "clockwise from north"
+                let az_deg = (HALF_PI - site_direction).to_degrees();
+                RadarObsCell::new(cell.r_meter, az_deg, cell.el_deg)
+            })
+            .collect();
+
+        let [s_start, s_end] = h_axis.phi_bounds;
+        let max_distance_meter = (s_start - s_end).abs() * earth_radius;
+        Self {
+            cells,
+            shape: (width, height),
+            max_distance_meter,
+            max_alt_km,
+        }
+    }
+}
+
+pub struct VerticalCrossSectionHorizontalAxis {
+    cells: Vec<(f64, f64, f64)>,
+    phi_bounds: [f64; 2],
+}
+
+impl VerticalCrossSectionHorizontalAxis {
+    // `n` is a number of pixels between `loc1` and `loc2`.
+    // `cells` will have `n + 1` length.
+    pub fn from(
+        loc1: &LatLonInRadians,
+        loc2: &LatLonInRadians,
+        n: usize,
+        site: &RadarSite,
+    ) -> Self {
+        let xyz1 = Xyz::from(loc1);
+        let xyz2 = Xyz::from(loc2);
+        let normal_vec = xyz1.unit_normal_vector(&xyz2);
+
+        let tx = AxisTransformation::new(normal_vec);
+        let project = |xyz: &Xyz| {
+            let xyz = xyz.transform(&tx);
+            LatLonInRadians::from(&xyz)
+        };
+
+        let LatLonInRadians(_theta, phi1) = project(&xyz1);
+        let LatLonInRadians(_theta, phi2) = project(&xyz2);
+        let phi_inc = (phi2 - phi1) / n as f64;
+        let site_ll = LatLonInRadians::from(&LatLonInDegrees(site.lat_deg, site.lon_deg));
+        let cells = (0..=n)
+            .map(|k| {
+                let phi = phi1 + phi_inc * k as f64;
+                let xyz = Xyz::from(&LatLonInRadians(0.0, phi)).transform_inverse(&tx);
+                let (site_distance, site_direction) =
+                    calc_distance_and_direction(&site_ll, &LatLonInRadians::from(&xyz));
+                (phi, site_distance, site_direction)
+            })
+            .collect();
+        Self {
+            cells,
+            phi_bounds: [phi1, phi2],
+        }
+    }
+}
+
+pub struct VerticalCrossSectionVerticalAxis(Vec<f64>);
+
+impl VerticalCrossSectionVerticalAxis {
+    // `n` is a number of pixels between the lower and upper altitude.
+    // `cells` will have `n + 1` length.
+    pub fn from(max_alt_km: u8, n: usize) -> Self {
+        let alt_inc_m = max_alt_km as f64 * 1000_f64 / n as f64;
+        let cells = (0..=n).rev().map(|k| alt_inc_m * k as f64).collect();
+        Self(cells)
     }
 }
 

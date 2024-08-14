@@ -194,23 +194,14 @@ impl VerticalCrossSectionHorizontalAxis {
             .into_iter()
             .map(|vertex| Xyz::from(vertex))
             .tuple_windows::<(_, _)>();
-        let (xyz1, xyz2) = path.next().unwrap();
-        let normal_vec = xyz1.unit_normal_vector(&xyz2);
-
-        let tx = AxisTransformation::new(normal_vec);
-        let project = |xyz: &Xyz| {
-            let xyz = xyz.transform(&tx);
-            LatLonInRadians::from(&xyz)
-        };
-
-        let LatLonInRadians(_theta, phi1) = project(&xyz1);
-        let LatLonInRadians(_theta, phi2) = project(&xyz2);
-        let phi_inc = (phi2 - phi1) / n as f64;
+        let (start, end) = path.next().unwrap();
+        let segment = PathSegment::from(&start, &end);
+        let phi_inc = segment.len() / n as f64;
         let site_ll = LatLonInRadians::from(&LatLonInDegrees(site.lat_deg, site.lon_deg));
         let cells = (0..=n)
             .map(|k| {
-                let phi = phi1 + phi_inc * k as f64;
-                let xyz = Xyz::from(&LatLonInRadians(0.0, phi)).transform_inverse(&tx);
+                let phi = phi_inc * k as f64;
+                let xyz = segment.xyz(phi);
                 let (site_distance, site_direction) =
                     calc_distance_and_direction(&site_ll, &LatLonInRadians::from(&xyz));
                 VerticalCrossSectionHorizontalPoint {
@@ -222,7 +213,7 @@ impl VerticalCrossSectionHorizontalAxis {
             .collect();
         Some(Self {
             cells,
-            phi_bounds: [phi1, phi2],
+            phi_bounds: [segment.phi_start, segment.phi_end],
         })
     }
 }
@@ -231,6 +222,40 @@ pub struct VerticalCrossSectionHorizontalPoint {
     phi: f64,
     site_distance: f64,
     site_direction: f64,
+}
+
+struct PathSegment {
+    tx: AxisTransformation,
+    phi_start: f64,
+    phi_end: f64,
+}
+
+impl PathSegment {
+    fn from(start: &Xyz, end: &Xyz) -> Self {
+        let normal_vec = start.unit_normal_vector(&end);
+        let tx = AxisTransformation::new(normal_vec);
+        let project = |xyz: &Xyz| {
+            let xyz = xyz.transform(&tx);
+            LatLonInRadians::from(&xyz)
+        };
+
+        let LatLonInRadians(_theta, phi_start) = project(&start);
+        let LatLonInRadians(_theta, phi_end) = project(&end);
+        Self {
+            tx,
+            phi_start,
+            phi_end,
+        }
+    }
+
+    fn xyz(&self, d_phi: f64) -> Xyz {
+        let phi = self.phi_start + d_phi;
+        Xyz::from(&LatLonInRadians(0.0, phi)).transform_inverse(&self.tx)
+    }
+
+    fn len(&self) -> f64 {
+        self.phi_end - self.phi_start
+    }
 }
 
 pub struct VerticalCrossSectionVerticalAxis(Vec<f64>);

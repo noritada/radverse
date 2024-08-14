@@ -1,4 +1,4 @@
-use std::f64::consts::PI;
+use std::{f64::consts::PI, vec::IntoIter};
 
 use itertools::Itertools;
 
@@ -107,7 +107,7 @@ impl From<&Xyz> for LatLonInRadians {
 }
 
 // Transformation of the polar axis from z-axis to the axis defined.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct AxisTransformation {
     theta: f64,
     phi: f64,
@@ -187,33 +187,26 @@ impl VerticalCrossSectionHorizontalAxis {
     // `n` is a number of pixels between `loc1` and `loc2`.
     // `cells` will have `n + 1` length.
     pub fn from(path: &[LatLonInRadians], n: usize, site: &RadarSite) -> Option<Self> {
-        if path.len() < 2 {
-            return None;
-        }
-        let mut path = path
+        let path = path
             .into_iter()
             .map(|vertex| Xyz::from(vertex))
             .tuple_windows::<(_, _)>();
-        let (start, end) = path.next().unwrap();
-        let segment = PathSegment::from(&start, &end);
-        let phi_inc = segment.len() / n as f64;
-        let site_ll = LatLonInRadians::from(&LatLonInDegrees(site.lat_deg, site.lon_deg));
-        let cells = (0..=n)
-            .map(|k| {
-                let phi = phi_inc * k as f64;
-                let xyz = segment.xyz(phi);
-                let (site_distance, site_direction) =
-                    calc_distance_and_direction(&site_ll, &LatLonInRadians::from(&xyz));
-                VerticalCrossSectionHorizontalPoint {
-                    phi,
-                    site_distance,
-                    site_direction,
-                }
+        let mut phi_total_start = 0_f64;
+        let segments = path
+            .map(|(start, end)| {
+                let segment = PathSegment::from(&start, &end);
+                let phi_total_end = phi_total_start + segment.len();
+                phi_total_start = phi_total_end;
+                (phi_total_end, segment)
             })
-            .collect();
+            .collect::<Vec<_>>();
+
+        let points = PathPoints::new(&segments, n, site)?;
+        let length = points.length;
+
         Some(Self {
-            cells,
-            phi_bounds: [segment.phi_start, segment.phi_end],
+            cells: points.collect(),
+            phi_bounds: [0., length],
         })
     }
 }
@@ -224,6 +217,7 @@ pub struct VerticalCrossSectionHorizontalPoint {
     site_direction: f64,
 }
 
+#[derive(Clone)]
 struct PathSegment {
     tx: AxisTransformation,
     phi_start: f64,
@@ -255,6 +249,69 @@ impl PathSegment {
 
     fn len(&self) -> f64 {
         self.phi_end - self.phi_start
+    }
+}
+
+struct PathPoints<'s> {
+    segments: std::slice::Iter<'s, (f64, PathSegment)>,
+    current: Option<&'s (f64, PathSegment)>,
+    length: f64,
+    points: IntoIter<f64>,
+    site: LatLonInRadians,
+}
+
+impl<'s> PathPoints<'s> {
+    fn new(segments: &'s [(f64, PathSegment)], n: usize, site: &RadarSite) -> Option<Self> {
+        let (length, _) = segments.last()?;
+        if *length == 0. {
+            return None;
+        }
+
+        let mut segments = segments.iter();
+        let current = segments.next();
+
+        let phi_inc = length / n as f64;
+        let points = (0..=n)
+            .map(|k| phi_inc * k as f64)
+            .collect::<Vec<_>>()
+            .into_iter();
+
+        let site = LatLonInRadians::from(&LatLonInDegrees(site.lat_deg, site.lon_deg));
+
+        Some(Self {
+            segments,
+            current,
+            length: *length,
+            points,
+            site,
+        })
+    }
+}
+
+impl<'s> Iterator for PathPoints<'s> {
+    type Item = VerticalCrossSectionHorizontalPoint;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let (mut end, mut segment) = self.current.unwrap().clone(); // safely unwrapped
+        let phi = self.points.next()?;
+        while phi > end {
+            self.current = self.segments.next();
+            (end, segment) = self.current.unwrap().clone(); // safely unwrapped
+        }
+
+        let d_phi = (segment.phi_end - segment.phi_start) - (end - phi);
+        let xyz = segment.xyz(d_phi);
+        let (site_distance, site_direction) =
+            calc_distance_and_direction(&self.site, &LatLonInRadians::from(&xyz));
+        Some(VerticalCrossSectionHorizontalPoint {
+            phi,
+            site_distance,
+            site_direction,
+        })
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.points.size_hint()
     }
 }
 

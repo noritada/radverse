@@ -10,7 +10,7 @@ const TWO_PI: f64 = PI + PI;
 #[derive(Debug, PartialEq)]
 pub struct LatLonInDegrees(pub f64, pub f64);
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Xyz(f64, f64, f64);
 
 impl Xyz {
@@ -141,60 +141,60 @@ pub struct VerticalCrossSection {
 
 impl VerticalCrossSection {
     pub fn new(
-        loc1: &LatLonInRadians,
-        loc2: &LatLonInRadians,
+        path: &[LatLonInRadians],
         max_alt_km: u8,
         (width, height): (usize, usize),
         site: &RadarSite,
-    ) -> Self {
+    ) -> Option<Self> {
         let earth_radius = crate::earth::calc_earth_radius(site.lat_deg.to_degrees());
-        let h_axis = VerticalCrossSectionHorizontalAxis::from(loc1, loc2, width, site);
+        let h_axis = VerticalCrossSectionHorizontalAxis::from(&path, width, site)?;
         let v_axis = VerticalCrossSectionVerticalAxis::from(max_alt_km, height);
         let h_cells = h_axis.cells;
         let VerticalCrossSectionVerticalAxis(v_cells) = v_axis;
         let cells = v_cells
             .iter()
             .cartesian_product(h_cells.iter())
-            .map(|(&alt_meter, &(_phi, site_distance, site_direction))| {
-                let dist_meter = site_distance * earth_radius;
+            .map(|(&alt_meter, point)| {
+                let dist_meter = point.site_distance * earth_radius;
                 let cell = RadarCenteredPoint {
                     alt_meter,
                     dist_meter,
                 };
                 let cell = RadarObsCellVertical::from((&cell, site));
                 // convert "anti-clockwise from east" to "clockwise from north"
-                let az_deg = (HALF_PI - site_direction).to_degrees();
+                let az_deg = (HALF_PI - point.site_direction).to_degrees();
                 RadarObsCell::new(cell.r_meter, az_deg, cell.el_deg)
             })
             .collect();
 
         let [s_start, s_end] = h_axis.phi_bounds;
         let max_distance_meter = (s_start - s_end).abs() * earth_radius;
-        Self {
+        Some(Self {
             cells,
             shape: (width, height),
             max_distance_meter,
             max_alt_km,
-        }
+        })
     }
 }
 
 pub struct VerticalCrossSectionHorizontalAxis {
-    cells: Vec<(f64, f64, f64)>,
+    cells: Vec<VerticalCrossSectionHorizontalPoint>,
     phi_bounds: [f64; 2],
 }
 
 impl VerticalCrossSectionHorizontalAxis {
     // `n` is a number of pixels between `loc1` and `loc2`.
     // `cells` will have `n + 1` length.
-    pub fn from(
-        loc1: &LatLonInRadians,
-        loc2: &LatLonInRadians,
-        n: usize,
-        site: &RadarSite,
-    ) -> Self {
-        let xyz1 = Xyz::from(loc1);
-        let xyz2 = Xyz::from(loc2);
+    pub fn from(path: &[LatLonInRadians], n: usize, site: &RadarSite) -> Option<Self> {
+        if path.len() < 2 {
+            return None;
+        }
+        let mut path = path
+            .into_iter()
+            .map(|vertex| Xyz::from(vertex))
+            .tuple_windows::<(_, _)>();
+        let (xyz1, xyz2) = path.next().unwrap();
         let normal_vec = xyz1.unit_normal_vector(&xyz2);
 
         let tx = AxisTransformation::new(normal_vec);
@@ -213,14 +213,24 @@ impl VerticalCrossSectionHorizontalAxis {
                 let xyz = Xyz::from(&LatLonInRadians(0.0, phi)).transform_inverse(&tx);
                 let (site_distance, site_direction) =
                     calc_distance_and_direction(&site_ll, &LatLonInRadians::from(&xyz));
-                (phi, site_distance, site_direction)
+                VerticalCrossSectionHorizontalPoint {
+                    phi,
+                    site_distance,
+                    site_direction,
+                }
             })
             .collect();
-        Self {
+        Some(Self {
             cells,
             phi_bounds: [phi1, phi2],
-        }
+        })
     }
+}
+
+pub struct VerticalCrossSectionHorizontalPoint {
+    phi: f64,
+    site_distance: f64,
+    site_direction: f64,
 }
 
 pub struct VerticalCrossSectionVerticalAxis(Vec<f64>);

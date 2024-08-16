@@ -22,7 +22,7 @@ impl RadarObsCell {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct RadarObsCellVertical {
     pub r_meter: f64,
     pub el_deg: f64,
@@ -77,8 +77,9 @@ fn calc_altitude_and_distance_on_sphere(
 
 // Inverse function:
 // ```
-// X = (r_eff + z) * sin(s / r_eff)
-// Y = sqrt(z * z - X * X) - sr
+// X = Z * sin(s / r_eff)
+// Y = sqrt(Z * Z - X * X) - sr
+// Z = r_eff + z
 // X = r * cos(el)
 // Y = r * sin(el)
 // ```
@@ -89,9 +90,31 @@ fn calc_altitude_and_distance_on_sphere_inverse(
     let r_earth = crate::earth::calc_earth_radius(site.lat_deg.to_radians());
     let r_eff = r_earth * 4_f64 / 3_f64;
     let sr = r_eff + site.alt_meter;
-    let x = (r_eff + point.alt_meter) * (point.dist_meter / r_eff).sin();
-    let y = (point.alt_meter * point.alt_meter - x * x).sqrt() - sr;
+    let z = r_eff + point.alt_meter;
+    let x = z * (point.dist_meter / r_eff).sin();
+    let y = (z * z - x * x).sqrt() - sr;
     let r_meter = (x * x + y * y).sqrt();
     let el_deg = y.atan2(x).to_degrees();
     RadarObsCellVertical { r_meter, el_deg }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn altitude_and_distance_calculation() {
+        let site = RadarSite {
+            lat_deg: 36.,
+            lon_deg: 140.,
+            alt_meter: 30.,
+        };
+        let point_original = RadarObsCellVertical {
+            r_meter: 50_000.,
+            el_deg: 0.,
+        };
+        let radar_centered = RadarCenteredPoint::from((&point_original, &site));
+        let point_calculated = RadarObsCellVertical::from((&radar_centered, &site));
+        assert_eq!(point_calculated, point_original);
+    }
 }

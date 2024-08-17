@@ -4,4 +4,5 @@ pub use spherical::*;
 mod color_map;
 mod earth;
 mod radar;
+mod renderer;
 mod spherical;

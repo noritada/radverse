@@ -46,7 +46,30 @@ impl FromStr for RgbColor {
 }
 
 // Thresholds are assumed to be sorted.
+#[derive(Debug, PartialEq)]
 pub struct ListedColorMap(Vec<(f64, RgbColor)>);
+
+impl FromStr for ListedColorMap {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let lines: Result<Vec<_>, _> = s
+            .lines()
+            .map(|line| {
+                let (key, value) = line
+                    .split_once(":")
+                    .ok_or_else(|| "key/value must be separated by a colon")?;
+                let key = key
+                    .trim()
+                    .parse::<f64>()
+                    .map_err(|_| "parsing a float value failed")?;
+                let value = value.trim().parse::<RgbColor>()?;
+                Ok((key, value))
+            })
+            .collect();
+        Ok(Self(lines?))
+    }
+}
 
 impl ColorMap for ListedColorMap {
     fn get_color(&self, value: f64) -> Option<&RgbColor> {
@@ -92,6 +115,20 @@ mod tests {
         ),
         (parsing_rgb_color_fails, "foobar!", None),
         (parsing_rgb_color_fails_for_longer_text, "#ffffffff", None),
+    }
+
+    #[test]
+    fn parsing_color_map() {
+        let s = "0.0:#000000
+            1.0 : #111111
+            2.0 : #222222";
+        let actual = s.parse::<ListedColorMap>();
+        let expected = Ok(ListedColorMap(vec![
+            (0.0, RgbColor::new(0x00, 0x00, 0x00)),
+            (1.0, RgbColor::new(0x11, 0x11, 0x11)),
+            (2.0, RgbColor::new(0x22, 0x22, 0x22)),
+        ]));
+        assert_eq!(actual, expected)
     }
 
     #[test]

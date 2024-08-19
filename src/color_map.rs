@@ -45,21 +45,13 @@ impl FromStr for RgbColor {
     }
 }
 
-pub(crate) struct ListedColorMap {
-    pub(crate) name: String,
-    // Colors are assumed to be sorted.
-    colors: Vec<(f64, RgbColor)>,
-}
-
-impl ListedColorMap {
-    pub(crate) fn new(name: String, colors: Vec<(f64, RgbColor)>) -> Self {
-        Self { name, colors }
-    }
-}
+// Thresholds are assumed to be sorted.
+pub struct ListedColorMap(Vec<(f64, RgbColor)>);
 
 impl ColorMap for ListedColorMap {
     fn get_color(&self, value: f64) -> Option<&RgbColor> {
-        self.colors.iter().rev().find_map(|(threshold, color)| {
+        let Self(inner) = self;
+        inner.iter().rev().find_map(|(threshold, color)| {
             if value > *threshold {
                 Some(color)
             } else {
@@ -114,7 +106,7 @@ mod tests {
             (10.0, color_ten.clone()),
             (100.0, color_hundred.clone()),
         ];
-        let color_map = ListedColorMap::new("foo".to_owned(), colors);
+        let color_map = ListedColorMap(colors);
         assert_eq!(color_map.get_color(-1.0), None);
         assert_eq!(color_map.get_color(-0.0), None);
         assert_eq!(color_map.get_color(0.0), None);

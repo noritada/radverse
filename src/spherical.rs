@@ -226,6 +226,29 @@ pub struct VerticalCrossSectionHorizontalPoint {
     site_direction: f64,
 }
 
+#[derive(Debug, PartialEq)]
+pub struct PathInDegrees(pub Vec<LatLonInDegrees>);
+
+impl std::str::FromStr for PathInDegrees {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let lines = s
+            .lines()
+            .map(|line| {
+                let (lat, lon) = line.trim_end().split_once(",")?;
+                Some(LatLonInDegrees(
+                    lat.parse::<f64>().ok()?,
+                    lon.parse::<f64>().ok()?,
+                ))
+            })
+            .collect::<Option<Vec<_>>>();
+        lines.map(|vec| Self(vec)).ok_or_else(|| {
+            "invalid format; path should be specified as lines of comma-separated lat/lon values"
+        })
+    }
+}
+
 #[derive(Clone)]
 struct PathSegment {
     tx: AxisTransformation,
@@ -640,6 +663,62 @@ mod tests {
         (
             distance_and_direction_calculation_along_meridian,
             LatLonInDegrees(36., 140.), LatLonInDegrees(37., 140.), 111_000., 90.
+        ),
+    }
+
+    macro_rules! test_parsing_path_specifiers {
+        ($((
+            $name:ident,
+            $spec:expr,
+            $expected:expr,
+        ),)*) => ($(
+            #[test]
+            fn $name() {
+                let spec = $spec;
+                let actual = spec.parse::<PathInDegrees>();
+                let expected = $expected;
+                assert_eq!(actual, expected);
+            }
+        )*);
+    }
+
+    test_parsing_path_specifiers! {
+        (
+            parsing_path_specifier_succeeding_for_empty_string,
+            "",
+            Ok(PathInDegrees(Vec::new())),
+        ),
+        (
+            parsing_path_specifier_succeeding,
+            "36.0,140.0\n37.0,141.0",
+            Ok(PathInDegrees(vec![
+                LatLonInDegrees(36.0, 140.0),
+                LatLonInDegrees(37.0, 141.0),
+            ])),
+        ),
+        (
+            parsing_path_specifier_succeeding_with_trailing_newline,
+            "36.0,140.0\n37.0,141.0\n",
+            Ok(PathInDegrees(vec![
+                LatLonInDegrees(36.0, 140.0),
+                LatLonInDegrees(37.0, 141.0),
+            ])),
+        ),
+        // should be fixed?
+        (
+            parsing_path_specifier_failing_for_wrong_lat_lon_values,
+            "136.0,140.0\n137.0,141.0\n",
+            Ok(PathInDegrees(vec![
+                LatLonInDegrees(136.0, 140.0),
+                LatLonInDegrees(137.0, 141.0),
+            ])),
+        ),
+        (
+            parsing_path_specifier_failing_for_nonnumerical_values,
+            "foo\nbar",
+            Err(
+                "invalid format; path should be specified as lines of comma-separated lat/lon values"
+            ),
         ),
     }
 }

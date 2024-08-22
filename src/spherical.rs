@@ -395,22 +395,7 @@ pub fn calc_distance_and_direction(loc1: &LatLonInRadians, loc2: &LatLonInRadian
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    macro_rules! assert_almost_eq {
-        ($a1:expr, $a2:expr, $d:expr) => {
-            if $a1 - $a2 > $d {
-                panic!(
-                    "assertion a1 - a2 <= delta failed\n a1 - a2: {} - {}\n   delta: {}",
-                    $a1, $a2, $d
-                );
-            } else if $a2 - $a1 > $d {
-                panic!(
-                    "assertion a2 - a1 <= delta failed\n a2 - a1: {} - {}\n   delta: {}",
-                    $a2, $a1, $d
-                );
-            }
-        };
-    }
+    use crate::test_helpers::*;
 
     macro_rules! test_xyz_to_lat_lon_rad {
         ($((

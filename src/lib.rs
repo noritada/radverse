@@ -6,3 +6,5 @@ mod earth;
 mod radar;
 mod renderer;
 mod spherical;
+#[cfg(test)]
+pub(crate) mod test_helpers;

@@ -198,7 +198,7 @@ impl VerticalCrossSectionHorizontalAxis {
     pub fn from(path: &[LatLonInRadians], n: usize, site: &RadarSite) -> Option<Self> {
         let path = path
             .into_iter()
-            .map(|vertex| Xyz::from(vertex))
+            .map(|waypoint| Xyz::from(waypoint))
             .tuple_windows::<(_, _)>();
         let mut phi_total_start = 0_f64;
         let segments = path

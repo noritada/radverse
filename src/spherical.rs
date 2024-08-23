@@ -238,8 +238,8 @@ impl std::str::FromStr for PathInDegrees {
             .map(|line| {
                 let (lat, lon) = line.trim_end().split_once(",")?;
                 Some(LatLonInDegrees(
-                    lat.parse::<f64>().ok()?,
-                    lon.parse::<f64>().ok()?,
+                    lat.trim().parse::<f64>().ok()?,
+                    lon.trim().parse::<f64>().ok()?,
                 ))
             })
             .collect::<Option<Vec<_>>>();
@@ -684,6 +684,14 @@ mod tests {
         (
             parsing_path_specifier_succeeding_with_trailing_newline,
             "36.0,140.0\n37.0,141.0\n",
+            Ok(PathInDegrees(vec![
+                LatLonInDegrees(36.0, 140.0),
+                LatLonInDegrees(37.0, 141.0),
+            ])),
+        ),
+        (
+            parsing_path_specifier_succeeding_with_whitespaces,
+            " 36.0 , 140.0 \n 37.0 , 141.0 \n",
             Ok(PathInDegrees(vec![
                 LatLonInDegrees(36.0, 140.0),
                 LatLonInDegrees(37.0, 141.0),

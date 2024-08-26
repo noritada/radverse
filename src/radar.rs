@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RadarSite {
     pub lat_deg: f64,
     pub lon_deg: f64,

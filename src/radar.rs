@@ -121,6 +121,39 @@ pub fn calc_r_and_z_from_s_and_el(s_meter: f64, el_deg: f64, site: &RadarSite) -
     (r, z)
 }
 
+#[derive(Debug)]
+pub struct RangeGateSpecInMeter {
+    start: f64,
+    gate_spacing: f64,
+    n_gates: usize,
+}
+
+impl RangeGateSpecInMeter {
+    pub fn new(start: f64, gate_spacing: f64, n_gates: usize) -> Self {
+        Self {
+            start,
+            gate_spacing,
+            n_gates,
+        }
+    }
+
+    pub fn find_index(&self, r_meter: f64) -> Option<usize> {
+        if r_meter < self.start {
+            return None;
+        }
+        let index = ((r_meter - self.start) / self.gate_spacing) as usize;
+        if index > self.n_gates {
+            None
+        } else {
+            Some(index)
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.n_gates
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

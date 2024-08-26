@@ -1,6 +1,6 @@
 use crate::{
     color_map::{ColorMap, ListedColorMap, RgbColor},
-    RadarObsCell, VerticalCrossSection,
+    RadarObsCell, RangeGateSpecInMeter, VerticalCrossSection,
 };
 
 pub trait Render {
@@ -12,10 +12,8 @@ pub trait Render {
 pub struct FixedElevationScanVerticalRenderer<'a> {
     // N * M length
     values: &'a [f64],
-    // N length
-    r_start_meter: &'a [f64],
-    // N length
-    r_end_meter: &'a [f64],
+    // n = N
+    range_gate_spec: &'a RangeGateSpecInMeter,
     // M length
     az_deg: &'a [f64],
     // Fixed
@@ -34,8 +32,7 @@ impl<'a> Render for FixedElevationScanVerticalRenderer<'a> {
             get_point_value(
                 cell,
                 self.values,
-                self.r_start_meter,
-                self.r_end_meter,
+                self.range_gate_spec,
                 self.az_deg,
                 self.el_deg,
                 self.half_beam_width_deg,
@@ -49,8 +46,7 @@ impl<'a> Render for FixedElevationScanVerticalRenderer<'a> {
 fn get_point_value(
     cell: &RadarObsCell,
     values: &[f64],
-    r_start_meter: &[f64],
-    r_end_meter: &[f64],
+    range_gate_spec: &RangeGateSpecInMeter,
     az_deg: &[f64],
     el_deg: f64,
     half_beam_width_deg: f64,
@@ -62,10 +58,7 @@ fn get_point_value(
     let az_index = az_deg
         .iter()
         .position(|az| (cell.az_deg - az).abs() <= half_beam_width_deg)?;
-    let r_index = r_start_meter
-        .iter()
-        .zip(r_end_meter.iter())
-        .position(|(&start, &end)| cell.r_meter >= start && cell.r_meter <= end)?;
-    let index = az_index * r_start_meter.len() + r_index;
+    let r_index = range_gate_spec.find_index(cell.r_meter)?;
+    let index = az_index * range_gate_spec.len() + r_index;
     Some(values[index])
 }

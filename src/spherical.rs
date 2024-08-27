@@ -161,17 +161,7 @@ impl VerticalCrossSection {
                     dist_meter,
                 };
                 let cell = RadarObsCellVertical::from((&cell, site));
-                // convert "anti-clockwise from east" to "clockwise from north"
-                let az_rad = HALF_PI - point.site_direction;
-                // normalize into `[0, TWO_PI)`
-                let az_rad = if az_rad < 0. {
-                    az_rad + TWO_PI
-                } else if az_rad < TWO_PI {
-                    az_rad
-                } else {
-                    az_rad - TWO_PI
-                };
-                let az_deg = az_rad.to_degrees();
+                let az_deg = point.site_direction.to_degrees();
                 RadarObsCell::new(cell.r_meter, az_deg, cell.el_deg)
             })
             .collect();
@@ -335,6 +325,16 @@ impl<'s> Iterator for PathPoints<'s> {
         let xyz = segment.xyz(d_phi);
         let (site_distance, site_direction) =
             calc_distance_and_direction(&self.site, &LatLonInRadians::from(&xyz));
+        // convert "anti-clockwise from east" to "clockwise from north"
+        let site_direction = HALF_PI - site_direction;
+        // normalize into `[0, TWO_PI)`
+        let site_direction = if site_direction < 0. {
+            site_direction + TWO_PI
+        } else if site_direction < TWO_PI {
+            site_direction
+        } else {
+            site_direction - TWO_PI
+        };
         Some(VerticalCrossSectionHorizontalPoint {
             phi,
             site_distance,

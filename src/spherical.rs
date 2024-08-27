@@ -162,16 +162,16 @@ impl VerticalCrossSection {
                 };
                 let cell = RadarObsCellVertical::from((&cell, site));
                 // convert "anti-clockwise from east" to "clockwise from north"
-                let az_deg = HALF_PI - point.site_direction;
+                let az_rad = HALF_PI - point.site_direction;
                 // normalize into `[0, TWO_PI)`
-                let az_deg = if az_deg < 0. {
-                    az_deg + TWO_PI
-                } else if az_deg < TWO_PI {
-                    az_deg
+                let az_rad = if az_rad < 0. {
+                    az_rad + TWO_PI
+                } else if az_rad < TWO_PI {
+                    az_rad
                 } else {
-                    az_deg - TWO_PI
+                    az_rad - TWO_PI
                 };
-                let az_deg = az_deg.to_degrees();
+                let az_deg = az_rad.to_degrees();
                 RadarObsCell::new(cell.r_meter, az_deg, cell.el_deg)
             })
             .collect();

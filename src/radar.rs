@@ -154,6 +154,23 @@ impl RangeGateSpecInMeter {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct PpiAngleSpecInDegrees {
+    pub el: f64,
+    pub half_el_beam_width: f64,
+    pub half_az_beam_width: f64,
+}
+
+impl PpiAngleSpecInDegrees {
+    pub fn new(el: f64, half_el_beam_width: f64, half_az_beam_width: f64) -> Self {
+        Self {
+            el,
+            half_el_beam_width,
+            half_az_beam_width,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

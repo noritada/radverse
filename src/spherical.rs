@@ -133,6 +133,7 @@ impl AxisTransformation {
 }
 
 pub struct VerticalCrossSection {
+    pub path_points: Vec<VerticalCrossSectionHorizontalPoint>,
     pub cells: Vec<RadarObsCell>,
     pub shape: (usize, usize),
     pub max_distance_meter: f64,
@@ -149,16 +150,23 @@ impl VerticalCrossSection {
         let earth_radius = crate::earth::calc_earth_radius(site.lat_deg.to_degrees());
         let h_axis = VerticalCrossSectionHorizontalAxis::from(&path, width, site)?;
         let v_axis = VerticalCrossSectionVerticalAxis::from(max_alt_km, height);
-        let h_cells = h_axis.cells;
+        let h_cells = h_axis
+            .cells
+            .iter()
+            .map(|point| {
+                let mut new_point = point.clone();
+                new_point.site_distance = point.site_distance * earth_radius;
+                new_point
+            })
+            .collect::<Vec<_>>();
         let VerticalCrossSectionVerticalAxis(v_cells) = v_axis;
         let cells = v_cells
             .iter()
             .cartesian_product(h_cells.iter())
             .map(|(&alt_meter, point)| {
-                let dist_meter = point.site_distance * earth_radius;
                 let cell = RadarCenteredPoint {
                     alt_meter,
-                    dist_meter,
+                    dist_meter: point.site_distance,
                 };
                 let cell = RadarObsCellVertical::from((&cell, site));
                 let az_deg = point.site_direction.to_degrees();
@@ -169,6 +177,7 @@ impl VerticalCrossSection {
         let [s_start, s_end] = h_axis.phi_bounds;
         let max_distance_meter = (s_start - s_end).abs() * earth_radius;
         Some(Self {
+            path_points: h_cells,
             cells,
             shape: (width, height),
             max_distance_meter,
@@ -210,10 +219,11 @@ impl VerticalCrossSectionHorizontalAxis {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct VerticalCrossSectionHorizontalPoint {
     phi: f64,
-    site_distance: f64,
-    site_direction: f64,
+    pub site_distance: f64,
+    pub site_direction: f64,
 }
 
 #[derive(Debug, PartialEq)]

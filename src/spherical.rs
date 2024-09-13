@@ -132,6 +132,18 @@ impl AxisTransformation {
     }
 }
 
+pub(crate) struct LocalXyzTransformation([Xyz; 3]);
+
+impl LocalXyzTransformation {
+    pub(crate) fn from(center: &LatLonInRadians) -> Self {
+        let LatLonInRadians(_lat, lon) = center;
+        let x = Xyz::from(&LatLonInRadians(0., lon + HALF_PI));
+        let z: Xyz = center.into();
+        let y = z.cross_product(&x);
+        Self([x, y, z])
+    }
+}
+
 pub struct VerticalCrossSection {
     pub path_points: Vec<VerticalCrossSectionHorizontalPoint>,
     pub cells: Vec<RadarObsCell>,
@@ -607,6 +619,46 @@ mod tests {
         (
             inverse_axis_transformation_of_z_using_z_axis,
             Xyz(0., 0., 1.), Xyz(0., 0., 1.), transform_inverse, Xyz(0., 0., 1.)
+        ),
+    }
+
+    macro_rules! test_local_xyz_transformation {
+        ($((
+            $name:ident,
+            $center:expr,
+            $expected:expr
+        ),)*) => ($(
+            #[test]
+            fn $name() {
+                let center = $center;
+                let tx = LocalXyzTransformation::from(&LatLonInRadians::from(&center));
+                let LocalXyzTransformation([actual_ax, actual_ay, actual_az]) = tx;
+                let [expected_ax, expected_ay, expected_az] = $expected;
+                assert_almost_eq!(actual_ax.0, expected_ax.0, 1.0e-15);
+                assert_almost_eq!(actual_ax.1, expected_ax.1, 1.0e-15);
+                assert_almost_eq!(actual_ax.2, expected_ax.2, 1.0e-15);
+                assert_almost_eq!(actual_ay.0, expected_ay.0, 1.0e-15);
+                assert_almost_eq!(actual_ay.1, expected_ay.1, 1.0e-15);
+                assert_almost_eq!(actual_ay.2, expected_ay.2, 1.0e-15);
+                assert_almost_eq!(actual_az.0, expected_az.0, 1.0e-15);
+                assert_almost_eq!(actual_az.1, expected_az.1, 1.0e-15);
+                assert_almost_eq!(actual_az.2, expected_az.2, 1.0e-15);
+            }
+        )*);
+    }
+
+    test_local_xyz_transformation! {
+        (
+            local_xyz_transformation_with_x_axis_centered,
+            LatLonInDegrees(0., 0.), [Xyz(0., 1., 0.), Xyz(0., 0., 1.), Xyz(1., 0., 0.)]
+        ),
+        (
+            local_xyz_transformation_with_y_axis_centered,
+            LatLonInDegrees(0., 90.), [Xyz(-1., 0., 0.), Xyz(0., 0., 1.), Xyz(0., 1., 0.)]
+        ),
+        (
+            local_xyz_transformation_with_z_axis_centered,
+            LatLonInDegrees(90., 0.), [Xyz(0., 1., 0.), Xyz(-1., 0., 0.), Xyz(0., 0., 1.)]
         ),
     }
 

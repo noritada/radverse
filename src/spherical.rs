@@ -4,11 +4,18 @@ use itertools::Itertools;
 
 use crate::{RadarCenteredPoint, RadarObsCell, RadarObsCellVertical, RadarSite};
 
-const HALF_PI: f64 = PI / 2.0;
+pub(crate) const HALF_PI: f64 = PI / 2.0;
 const TWO_PI: f64 = PI + PI;
 
 #[derive(Debug, PartialEq)]
 pub struct LatLonInDegrees(pub f64, pub f64);
+
+impl From<&LatLonInRadians> for LatLonInDegrees {
+    fn from(value: &LatLonInRadians) -> Self {
+        let LatLonInRadians(lat, lon) = value;
+        Self(lat.to_degrees(), lon.to_degrees())
+    }
+}
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Xyz(f64, f64, f64);
@@ -36,7 +43,7 @@ impl Xyz {
         (self.0 * self.0 + self.1 * self.1 + self.2 * self.2).sqrt()
     }
 
-    fn rotate_around_x_axis(&self, sin_theta: f64, cos_theta: f64) -> Self {
+    pub(crate) fn rotate_around_x_axis(&self, sin_theta: f64, cos_theta: f64) -> Self {
         let Self(x, y, z) = &self;
         Self(
             *x,

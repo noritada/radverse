@@ -1,3 +1,5 @@
+use crate::{LatLonInDegrees, LatLonInRadians, Xyz};
+
 #[derive(Debug, Clone)]
 pub struct RadarSite {
     pub lat_deg: f64,
@@ -121,6 +123,24 @@ pub fn calc_r_and_z_from_s_and_el(s_meter: f64, el_deg: f64, site: &RadarSite) -
     (r, z)
 }
 
+pub fn calc_lat_lon_from_s_and_az(s_meter: f64, az_rad: f64, site: &RadarSite) -> LatLonInRadians {
+    // in the coordinate where the site is (0, 0)
+    let r_earth = crate::earth::calc_earth_radius(site.lat_deg.to_radians());
+    let theta = crate::HALF_PI - az_rad;
+    let xyz = Xyz::from(&LatLonInRadians(0., s_meter / r_earth))
+        .rotate_around_x_axis(theta.sin(), theta.cos());
+
+    // in the site local coordinate
+    let tx = crate::LocalXyzTransformation::from(&LatLonInRadians(0., 0.));
+    let xyz = tx.transform(&xyz);
+
+    // reprojected to the original coordinate
+    let site = LatLonInRadians::from(&LatLonInDegrees(site.lat_deg, site.lon_deg));
+    let tx = crate::LocalXyzTransformation::from(&site);
+    let xyz = tx.transform_inverse(&xyz);
+    LatLonInRadians::from(&xyz)
+}
+
 #[derive(Debug)]
 pub struct RangeGateSpecInMeter {
     start: f64,
@@ -212,5 +232,42 @@ mod tests {
         };
         let point_calculated = RadarObsCellVertical::from((&radar_centered, &site));
         assert_almost_eq!(point_calculated.el_deg, el_deg, 1.0e-10);
+    }
+
+    macro_rules! test_lat_lon_calculation_from_s_and_az {
+        ($((
+            $name:ident,
+            $s_meter:expr,
+            $az_deg:expr,
+            $site:expr,
+            $expected:expr
+        ),)*) => ($(
+            #[test]
+            fn $name() {
+                let (s_meter, az_deg, site) = ($s_meter, $az_deg, $site);
+                let latlon = calc_lat_lon_from_s_and_az(s_meter, az_deg.to_radians(), &site);
+                let actual = LatLonInDegrees::from(&latlon);
+                let expected = $expected;
+                assert_almost_eq!(actual.0, expected.0, 1.0e0);
+                assert_almost_eq!(actual.1, expected.1, 1.0e0);
+            }
+        )*);
+    }
+
+    test_lat_lon_calculation_from_s_and_az! {
+        (
+            lat_lon_calculation_from_s_and_az_around_y_for_minus_x,
+            10_000_000.,
+            90_f64,
+            RadarSite {lat_deg: 0., lon_deg: 90., alt_meter: 30.},
+            LatLonInDegrees(0., 180.)
+        ),
+        (
+            lat_lon_calculation_from_s_and_az_around_y_for_x,
+            10_000_000.,
+            270_f64,
+            RadarSite {lat_deg: 0., lon_deg: 90., alt_meter: 30.},
+            LatLonInDegrees(0., 0.)
+        ),
     }
 }

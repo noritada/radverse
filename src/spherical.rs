@@ -374,7 +374,7 @@ impl<'s> Iterator for PathPoints<'s> {
     fn next(&mut self) -> Option<Self::Item> {
         let (mut end, mut segment) = self.current.unwrap().clone(); // safely unwrapped
         let phi = self.points.next()?;
-        while phi > end {
+        while phi > end + f64::EPSILON {
             self.current = self.segments.next();
             (end, segment) = self.current.unwrap().clone(); // safely unwrapped
         }
@@ -930,5 +930,21 @@ mod tests {
                 "invalid format; path should be specified as lines of comma-separated lat/lon values"
             ),
         ),
+    }
+
+    #[test]
+    fn regression_test_for_crashes_caused_by_rounding_errors() {
+        let path_spec =
+            "-30.61788354116184,-40.608893002640784\n-30.87973113791563,-40.8162709218129";
+        let PathInDegrees(path) = path_spec.parse::<PathInDegrees>().unwrap();
+        let path: Vec<LatLonInRadians> = path.iter().map(|loc| loc.into()).collect();
+        let width = 689;
+        let site = RadarSite {
+            lat_deg: 34.17444568059641,
+            lon_deg: 139.17029552581388,
+            alt_meter: 87.9,
+        };
+        let h_axis = VerticalCrossSectionHorizontalAxis::from(&path, width, &site);
+        assert!(h_axis.is_some())
     }
 }

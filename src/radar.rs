@@ -1,13 +1,13 @@
 use crate::{LatLonInDegrees, LatLonInRadians, Xyz};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct RadarSite {
     pub lat_deg: f64,
     pub lon_deg: f64,
     pub alt_meter: f64,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct RadarObsCell {
     pub r_meter: f64,
     pub az_deg: f64,
@@ -24,7 +24,7 @@ impl RadarObsCell {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct RadarObsCellVertical {
     pub r_meter: f64,
     pub el_deg: f64,
@@ -37,7 +37,7 @@ impl From<(&RadarCenteredPoint, &RadarSite)> for RadarObsCellVertical {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct RadarCenteredPoint {
     pub alt_meter: f64,
     pub dist_meter: f64,
@@ -141,7 +141,7 @@ pub fn calc_lat_lon_from_s_and_az(s_meter: f64, az_rad: f64, site: &RadarSite) -
     LatLonInRadians::from(&xyz)
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct RangeGateSpecInMeter {
     start: f64,
     gate_spacing: f64,
@@ -174,7 +174,7 @@ impl RangeGateSpecInMeter {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct PpiAngleSpecInDegrees {
     pub el: f64,
     pub half_el_beam_width: f64,

@@ -7,7 +7,7 @@ use crate::{RadarCenteredPoint, RadarObsCell, RadarObsCellVertical, RadarSite};
 pub(crate) const HALF_PI: f64 = PI / 2.0;
 const TWO_PI: f64 = PI + PI;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct LatLonInDegrees(pub f64, pub f64);
 
 impl From<&LatLonInRadians> for LatLonInDegrees {
@@ -93,7 +93,7 @@ impl From<&LatLonInDegrees> for Xyz {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct LatLonInRadians(pub f64, pub f64);
 
 impl From<&LatLonInDegrees> for LatLonInRadians {
@@ -180,6 +180,7 @@ impl LocalXyzTransformation {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub struct VerticalCrossSection {
     pub path_points: Vec<VerticalCrossSectionHorizontalPoint>,
     pub cells: Vec<RadarObsCell>,
@@ -234,6 +235,7 @@ impl VerticalCrossSection {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub struct VerticalCrossSectionHorizontalAxis {
     cells: Vec<VerticalCrossSectionHorizontalPoint>,
     phi_bounds: [f64; 2],
@@ -267,7 +269,7 @@ impl VerticalCrossSectionHorizontalAxis {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct VerticalCrossSectionHorizontalPoint {
     phi: f64,
     pub site_distance: f64,
@@ -297,7 +299,7 @@ impl std::str::FromStr for PathInDegrees {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 struct PathSegment {
     tx: AxisTransformation,
     phi_start: f64,
@@ -405,6 +407,7 @@ impl<'s> Iterator for PathPoints<'s> {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub struct VerticalCrossSectionVerticalAxis(Vec<f64>);
 
 impl VerticalCrossSectionVerticalAxis {

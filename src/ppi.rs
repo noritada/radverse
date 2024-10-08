@@ -1,4 +1,4 @@
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Azimuth {
     Simple(usize),
     Degrees(Vec<f64>, f64),

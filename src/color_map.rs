@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{cell::LazyCell, str::FromStr};
 
 use itertools::Itertools;
 
@@ -16,6 +16,19 @@ pub struct RgbColor {
 impl RgbColor {
     pub fn new(red: u8, green: u8, blue: u8) -> Self {
         Self { red, green, blue }
+    }
+}
+
+impl From<&[u8; 3]> for RgbColor {
+    fn from(value: &[u8; 3]) -> Self {
+        let [red, green, blue] = *value;
+        Self { red, green, blue }
+    }
+}
+
+impl From<&RgbColor> for [u8; 3] {
+    fn from(value: &RgbColor) -> Self {
+        [value.red, value.green, value.blue]
     }
 }
 
@@ -47,7 +60,7 @@ impl FromStr for RgbColor {
 
 // Thresholds are assumed to be sorted.
 #[derive(Debug, PartialEq)]
-pub struct ListedColorMap(Vec<(f64, RgbColor)>);
+pub struct ListedColorMap(pub Vec<(f64, RgbColor)>);
 
 impl FromStr for ListedColorMap {
     type Err = &'static str;
@@ -83,6 +96,21 @@ impl ColorMap for ListedColorMap {
         })
     }
 }
+
+pub const JMA_RADAR_COLOR_MAP: LazyCell<ListedColorMap> = LazyCell::new(|| {
+    ListedColorMap(vec![
+        (-9999., RgbColor::from(&[0xff, 0xff, 0xff])),
+        (0.01, RgbColor::from(&[0x99, 0xff, 0xff])),
+        (1., RgbColor::from(&[0x66, 0xcc, 0xff])),
+        (5., RgbColor::from(&[0x21, 0x98, 0xff])),
+        (10., RgbColor::from(&[0x00, 0x38, 0xff])),
+        (20., RgbColor::from(&[0xfa, 0xf5, 0x00])),
+        (30., RgbColor::from(&[0xff, 0x99, 0x00])),
+        (50., RgbColor::from(&[0xe7, 0x28, 0x00])),
+        (80., RgbColor::from(&[0x9a, 0x00, 0x79])),
+        (200., RgbColor::from(&[0x00, 0x00, 0x00])),
+    ])
+});
 
 #[cfg(test)]
 mod tests {

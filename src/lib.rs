@@ -1,3 +1,4 @@
+pub use color_map::*;
 pub use ppi::*;
 pub use radar::*;
 pub use spherical::*;

@@ -2,8 +2,8 @@ use std::{cell::LazyCell, str::FromStr};
 
 use itertools::Itertools;
 
-pub trait ColorMap {
-    fn get_color(&self, value: f64) -> Option<&RgbColor>;
+pub trait RgbColorMap {
+    fn get_rgb(&self, value: f64) -> Option<&RgbColor>;
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -84,8 +84,8 @@ impl FromStr for ListedColorMap {
     }
 }
 
-impl ColorMap for ListedColorMap {
-    fn get_color(&self, value: f64) -> Option<&RgbColor> {
+impl RgbColorMap for ListedColorMap {
+    fn get_rgb(&self, value: f64) -> Option<&RgbColor> {
         let Self(inner) = self;
         inner.iter().rev().find_map(|(threshold, color)| {
             if value > *threshold {
@@ -172,14 +172,14 @@ mod tests {
             (100.0, color_hundred.clone()),
         ];
         let color_map = ListedColorMap(colors);
-        assert_eq!(color_map.get_color(-1.0), None);
-        assert_eq!(color_map.get_color(-0.0), None);
-        assert_eq!(color_map.get_color(0.0), None);
-        assert_eq!(color_map.get_color(0.1), Some(&color_zero));
-        assert_eq!(color_map.get_color(1.0), Some(&color_zero));
-        assert_eq!(color_map.get_color(1.5), Some(&color_one));
-        assert_eq!(color_map.get_color(2.0), Some(&color_one));
-        assert_eq!(color_map.get_color(20.0), Some(&color_ten));
-        assert_eq!(color_map.get_color(200.0), Some(&color_hundred));
+        assert_eq!(color_map.get_rgb(-1.0), None);
+        assert_eq!(color_map.get_rgb(-0.0), None);
+        assert_eq!(color_map.get_rgb(0.0), None);
+        assert_eq!(color_map.get_rgb(0.1), Some(&color_zero));
+        assert_eq!(color_map.get_rgb(1.0), Some(&color_zero));
+        assert_eq!(color_map.get_rgb(1.5), Some(&color_one));
+        assert_eq!(color_map.get_rgb(2.0), Some(&color_one));
+        assert_eq!(color_map.get_rgb(20.0), Some(&color_ten));
+        assert_eq!(color_map.get_rgb(200.0), Some(&color_hundred));
     }
 }

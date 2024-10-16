@@ -1,5 +1,5 @@
 use crate::{
-    color_map::{ColorMap, ListedColorMap, RgbColor},
+    color_map::{ListedColorMap, RgbColor, RgbColorMap},
     Azimuth, PpiAngleSpecInDegrees, RadarObsCell, RangeGateSpecInMeter, VerticalCrossSection,
 };
 
@@ -34,7 +34,7 @@ impl<'a> Render for FixedElevationScanVerticalRenderer<'a> {
                 self.angle_spec,
                 &self.az,
             )
-            .and_then(|value| self.color_map.get_color(value).cloned())
+            .and_then(|value| self.color_map.get_rgb(value).cloned())
             .unwrap_or(self.default_color.clone())
         })
     }

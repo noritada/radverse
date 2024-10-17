@@ -86,6 +86,9 @@ impl FromStr for ListedColorMap {
 
 impl RgbColorMap for ListedColorMap {
     fn get_rgb(&self, value: f64) -> Option<&RgbColor> {
+        if value.is_nan() {
+            return None;
+        }
         let Self(inner) = self;
         inner.iter().rev().find_map(|(threshold, color)| {
             if value > *threshold {

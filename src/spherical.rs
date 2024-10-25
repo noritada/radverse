@@ -1,4 +1,4 @@
-use std::{f64::consts::PI, vec::IntoIter};
+use std::{f64::consts::PI, ops::Range, vec::IntoIter};
 
 use itertools::Itertools;
 
@@ -417,6 +417,57 @@ impl VerticalCrossSectionVerticalAxis {
         let alt_inc_m = max_alt_km as f64 * 1000_f64 / n as f64;
         let cells = (0..=n).rev().map(|k| alt_inc_m * k as f64).collect();
         Self(cells)
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct ElevationRanges(Vec<(Range<f64>, Option<Elevation>)>);
+
+impl ElevationRanges {
+    pub fn from(elevations_sorted: &[Elevation]) -> Self {
+        let mut iter = elevations_sorted.into_iter().peekable();
+        let mut vec = Vec::new();
+        let mut boundary = None;
+
+        while let Some(el) = iter.next() {
+            let (start, end) = (el.angle - el.width, el.angle + el.width);
+            let start = boundary.unwrap_or(start);
+            let end = if let Some(next) = iter.peek() {
+                let next_start = next.angle - next.width;
+                if end < next_start {
+                    boundary = None;
+                    end
+                } else {
+                    let new_end = (end + next_start) / 2.;
+                    boundary = Some(new_end);
+                    new_end
+                }
+            } else {
+                end
+            };
+            vec.push((start..end, Some(el.clone())));
+
+            if boundary.is_none() {
+                if let Some(next) = iter.peek() {
+                    let next_start = next.angle - next.width;
+                    vec.push((end..next_start, None));
+                }
+            }
+        }
+
+        Self(vec)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Elevation {
+    angle: f64,
+    width: f64,
+}
+
+impl Elevation {
+    pub fn new(angle: f64, width: f64) -> Self {
+        Self { angle, width }
     }
 }
 
@@ -949,5 +1000,41 @@ mod tests {
         };
         let h_axis = VerticalCrossSectionHorizontalAxis::from(&path, width, &site);
         assert!(h_axis.is_some())
+    }
+
+    macro_rules! test_elevation_ranges {
+        ($((
+            $name:ident,
+            $elevations:expr,
+            $expected:expr
+        ),)*) => ($(
+            #[test]
+            fn $name() {
+                let elevations = $elevations;
+                let actual = ElevationRanges::from(&elevations);
+                let expected = ElevationRanges($expected);
+                assert_eq!(actual, expected);
+            }
+        )*);
+    }
+
+    test_elevation_ranges! {
+        (
+            elevation_ranges_for_nonoverlapping_elevations,
+            vec![Elevation::new(2., 1.), Elevation::new(5., 1.)],
+            vec![
+                (1.0..3.0, Some(Elevation::new(2., 1.))),
+                (3.0..4.0, None),
+                (4.0..6.0, Some(Elevation::new(5., 1.))),
+            ]
+        ),
+        (
+            elevation_ranges_for_overlapping_elevations,
+            vec![Elevation::new(2., 2.), Elevation::new(5., 2.)],
+            vec![
+                (0.0..3.5, Some(Elevation::new(2., 2.))),
+                (3.5..7.0, Some(Elevation::new(5., 2.))),
+            ]
+        ),
     }
 }

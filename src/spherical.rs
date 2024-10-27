@@ -425,16 +425,17 @@ pub struct ElevationRanges(Vec<(Range<f64>, Option<Elevation>)>);
 
 impl ElevationRanges {
     pub fn from(elevations_sorted: &[Elevation]) -> Self {
-        let mut iter = elevations_sorted.into_iter().peekable();
+        let mut iter = elevations_sorted
+            .into_iter()
+            .map(|el| (el, el.angle - el.width, el.angle + el.width))
+            .peekable();
         let mut vec = Vec::new();
         let mut boundary = None;
 
-        while let Some(el) = iter.next() {
-            let (start, end) = (el.angle - el.width, el.angle + el.width);
+        while let Some((el, start, end)) = iter.next() {
             let start = boundary.unwrap_or(start);
-            let end = if let Some(next) = iter.peek() {
-                let next_start = next.angle - next.width;
-                if end < next_start {
+            let end = if let Some((_, next_start, _)) = iter.peek() {
+                if end < *next_start {
                     boundary = None;
                     end
                 } else {
@@ -448,9 +449,8 @@ impl ElevationRanges {
             vec.push((start..end, Some(el.clone())));
 
             if boundary.is_none() {
-                if let Some(next) = iter.peek() {
-                    let next_start = next.angle - next.width;
-                    vec.push((end..next_start, None));
+                if let Some((_, next_start, _)) = iter.peek() {
+                    vec.push((end..*next_start, None));
                 }
             }
         }

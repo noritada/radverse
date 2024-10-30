@@ -26,9 +26,10 @@ impl<'a> Render for FixedElevationScanVerticalRenderer<'a> {
     type Color = RgbColor;
 
     fn render(&self) -> impl Iterator<Item = Self::Color> {
-        self.vcs.cells.iter().map(|cell| {
+        let cells = self.vcs.cells();
+        cells.into_iter().map(|cell| {
             get_point_value(
-                cell,
+                &cell,
                 self.values,
                 self.range_gate_spec,
                 self.angle_spec,

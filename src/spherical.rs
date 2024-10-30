@@ -183,7 +183,8 @@ impl LocalXyzTransformation {
 #[derive(Debug, PartialEq)]
 pub struct VerticalCrossSection {
     pub path_points: Vec<VerticalCrossSectionHorizontalPoint>,
-    pub cells: Vec<RadarObsCell>,
+    v_axis: VerticalCrossSectionVerticalAxis,
+    site: RadarSite,
     pub shape: (usize, usize),
     pub max_distance_meter: f64,
     pub max_alt_km: u8,
@@ -208,30 +209,34 @@ impl VerticalCrossSection {
                 new_point
             })
             .collect::<Vec<_>>();
-        let VerticalCrossSectionVerticalAxis(v_cells) = v_axis;
-        let cells = v_cells
-            .iter()
-            .cartesian_product(h_cells.iter())
-            .map(|(&alt_meter, point)| {
-                let cell = RadarCenteredPoint {
-                    alt_meter,
-                    dist_meter: point.site_distance,
-                };
-                let cell = RadarObsCellVertical::from((&cell, site));
-                let az_deg = point.site_direction.to_degrees();
-                RadarObsCell::new(cell.r_meter, az_deg, cell.el_deg)
-            })
-            .collect();
 
         let [s_start, s_end] = h_axis.phi_bounds;
         let max_distance_meter = (s_start - s_end).abs() * earth_radius;
         Some(Self {
             path_points: h_cells,
-            cells,
+            v_axis,
+            site: site.clone(),
             shape: (width, height),
             max_distance_meter,
             max_alt_km,
         })
+    }
+
+    pub fn cells(&self) -> Vec<RadarObsCell> {
+        let VerticalCrossSectionVerticalAxis(ref v_cells) = self.v_axis;
+        v_cells
+            .iter()
+            .cartesian_product(self.path_points.iter())
+            .map(|(&alt_meter, point)| {
+                let cell = RadarCenteredPoint {
+                    alt_meter,
+                    dist_meter: point.site_distance,
+                };
+                let cell = RadarObsCellVertical::from((&cell, &self.site));
+                let az_deg = point.site_direction.to_degrees();
+                RadarObsCell::new(cell.r_meter, az_deg, cell.el_deg)
+            })
+            .collect()
     }
 }
 

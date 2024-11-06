@@ -1,6 +1,6 @@
 use crate::{
     color_map::{ListedColorMap, RgbColor, RgbColorMap},
-    Azimuth, PpiAngleSpecInDegrees, RadarObsCell, RangeGateSpecInMeter, VerticalCrossSection,
+    Azimuth, PpiElevationSpecInDegrees, RadarObsCell, RangeGateSpecInMeter, VerticalCrossSection,
 };
 
 pub trait Render {
@@ -14,7 +14,7 @@ pub struct FixedElevationScanVerticalRenderer<'a> {
     values: &'a [f64],
     // n = N
     range_gate_spec: &'a RangeGateSpecInMeter,
-    angle_spec: &'a PpiAngleSpecInDegrees,
+    el_spec: &'a PpiElevationSpecInDegrees,
     // M length
     az: Azimuth,
     vcs: &'a VerticalCrossSection,
@@ -32,7 +32,7 @@ impl<'a> Render for FixedElevationScanVerticalRenderer<'a> {
                 &cell,
                 self.values,
                 self.range_gate_spec,
-                self.angle_spec,
+                self.el_spec,
                 &self.az,
             )
             .and_then(|value| self.color_map.get_rgb(value).cloned())
@@ -45,10 +45,10 @@ fn get_point_value(
     cell: &RadarObsCell,
     values: &[f64],
     range_gate_spec: &RangeGateSpecInMeter,
-    angle_spec: &PpiAngleSpecInDegrees,
+    el_spec: &PpiElevationSpecInDegrees,
     az: &Azimuth,
 ) -> Option<f64> {
-    if (cell.el_deg - angle_spec.el).abs() > angle_spec.half_el_beam_width {
+    if (cell.el_deg - el_spec.angle).abs() > el_spec.half_beam_width {
         return None;
     }
 

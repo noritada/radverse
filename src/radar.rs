@@ -175,16 +175,16 @@ impl RangeGateSpecInMeter {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct PpiAngleSpecInDegrees {
-    pub el: f64,
-    pub half_el_beam_width: f64,
+pub struct PpiElevationSpecInDegrees {
+    pub angle: f64,
+    pub half_beam_width: f64,
 }
 
-impl PpiAngleSpecInDegrees {
-    pub fn new(el: f64, half_el_beam_width: f64) -> Self {
+impl PpiElevationSpecInDegrees {
+    pub fn new(angle: f64, half_beam_width: f64) -> Self {
         Self {
-            el,
-            half_el_beam_width,
+            angle,
+            half_beam_width,
         }
     }
 }

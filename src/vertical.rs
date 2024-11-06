@@ -4,7 +4,8 @@ use itertools::Itertools;
 
 use crate::{
     calc_distance_and_direction, AxisTransformation, LatLonInDegrees, LatLonInRadians,
-    RadarCenteredPoint, RadarObsCell, RadarObsCellVertical, RadarSite, Xyz, HALF_PI, TWO_PI,
+    PpiElevationSpecInDegrees, RadarCenteredPoint, RadarObsCell, RadarObsCellVertical, RadarSite,
+    Xyz, HALF_PI, TWO_PI,
 };
 
 #[derive(Debug, PartialEq)]
@@ -253,13 +254,19 @@ impl VerticalCrossSectionVerticalAxis {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct ElevationRanges(Vec<(Range<f64>, Option<Elevation>)>);
+pub struct ElevationRanges(Vec<(Range<f64>, Option<PpiElevationSpecInDegrees>)>);
 
 impl ElevationRanges {
-    pub fn from(elevations_sorted: &[Elevation]) -> Self {
+    pub fn from(elevations_sorted: &[PpiElevationSpecInDegrees]) -> Self {
         let mut iter = elevations_sorted
             .into_iter()
-            .map(|el| (el, el.angle - el.width, el.angle + el.width))
+            .map(|el| {
+                (
+                    el,
+                    el.angle - el.half_beam_width,
+                    el.angle + el.half_beam_width,
+                )
+            })
             .peekable();
         let mut vec = Vec::new();
         let mut boundary = None;
@@ -288,18 +295,6 @@ impl ElevationRanges {
         }
 
         Self(vec)
-    }
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Elevation {
-    angle: f64,
-    width: f64,
-}
-
-impl Elevation {
-    pub fn new(angle: f64, width: f64) -> Self {
-        Self { angle, width }
     }
 }
 
@@ -406,19 +401,19 @@ mod tests {
     test_elevation_ranges! {
         (
             elevation_ranges_for_nonoverlapping_elevations,
-            vec![Elevation::new(2., 1.), Elevation::new(5., 1.)],
+            vec![PpiElevationSpecInDegrees::new(2., 1.), PpiElevationSpecInDegrees::new(5., 1.)],
             vec![
-                (1.0..3.0, Some(Elevation::new(2., 1.))),
+                (1.0..3.0, Some(PpiElevationSpecInDegrees::new(2., 1.))),
                 (3.0..4.0, None),
-                (4.0..6.0, Some(Elevation::new(5., 1.))),
+                (4.0..6.0, Some(PpiElevationSpecInDegrees::new(5., 1.))),
             ]
         ),
         (
             elevation_ranges_for_overlapping_elevations,
-            vec![Elevation::new(2., 2.), Elevation::new(5., 2.)],
+            vec![PpiElevationSpecInDegrees::new(2., 2.), PpiElevationSpecInDegrees::new(5., 2.)],
             vec![
-                (0.0..3.5, Some(Elevation::new(2., 2.))),
-                (3.5..7.0, Some(Elevation::new(5., 2.))),
+                (0.0..3.5, Some(PpiElevationSpecInDegrees::new(2., 2.))),
+                (3.5..7.0, Some(PpiElevationSpecInDegrees::new(5., 2.))),
             ]
         ),
     }

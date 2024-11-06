@@ -141,54 +141,6 @@ pub fn calc_lat_lon_from_s_and_az(s_meter: f64, az_rad: f64, site: &RadarSite) -
     LatLonInRadians::from(&xyz)
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub struct RangeGateSpecInMeter {
-    start: f64,
-    gate_spacing: f64,
-    n_gates: usize,
-}
-
-impl RangeGateSpecInMeter {
-    pub fn new(start: f64, gate_spacing: f64, n_gates: usize) -> Self {
-        Self {
-            start,
-            gate_spacing,
-            n_gates,
-        }
-    }
-
-    pub fn find_index(&self, r_meter: f64) -> Option<usize> {
-        if r_meter < self.start {
-            return None;
-        }
-        let index = ((r_meter - self.start) / self.gate_spacing) as usize;
-        if index > self.n_gates {
-            None
-        } else {
-            Some(index)
-        }
-    }
-
-    pub fn len(&self) -> usize {
-        self.n_gates
-    }
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct PpiElevationSpecInDegrees {
-    pub angle: f64,
-    pub half_beam_width: f64,
-}
-
-impl PpiElevationSpecInDegrees {
-    pub fn new(angle: f64, half_beam_width: f64) -> Self {
-        Self {
-            angle,
-            half_beam_width,
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

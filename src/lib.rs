@@ -1,6 +1,7 @@
 pub use color_map::*;
 pub use ppi::*;
 pub use radar::*;
+pub use renderer::*;
 pub use spherical::*;
 pub use vertical::*;
 

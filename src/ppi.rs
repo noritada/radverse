@@ -1,3 +1,40 @@
+use crate::RadarObsCell;
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Ppi<'v> {
+    values: &'v [f64],
+    range: RangeGateSpecInMeter,
+    az: Azimuth,
+    el: PpiElevationSpecInDegrees,
+}
+
+impl<'v> Ppi<'v> {
+    pub fn new(
+        values: &'v [f64],
+        range: RangeGateSpecInMeter,
+        az: Azimuth,
+        el: PpiElevationSpecInDegrees,
+    ) -> Self {
+        Self {
+            values,
+            range,
+            az,
+            el,
+        }
+    }
+
+    pub fn value_at(&self, cell: &RadarObsCell) -> Option<f64> {
+        if (cell.el_deg - self.el.angle).abs() > self.el.half_beam_width {
+            return None;
+        }
+
+        let az_index = self.az.position(cell.az_deg)?;
+        let r_index = self.range.find_index(cell.r_meter)?;
+        let index = az_index * self.range.len() + r_index;
+        Some(self.values[index])
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct RangeGateSpecInMeter {
     start: f64,

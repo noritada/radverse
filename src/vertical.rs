@@ -254,26 +254,26 @@ impl VerticalCrossSectionVerticalAxis {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct ElevationRanges(Vec<(Range<f64>, Option<PpiElevationSpecInDegrees>)>);
+pub struct ElevationRanges<'p, T>(Vec<(Range<f64>, Option<&'p T>)>);
 
-impl ElevationRanges {
-    pub fn from(elevations_sorted: &[PpiElevationSpecInDegrees]) -> Self {
+impl<'p, T> ElevationRanges<'p, T> {
+    pub fn from(elevations_sorted: &'p [(PpiElevationSpecInDegrees, T)]) -> Self {
         let mut iter = elevations_sorted
             .into_iter()
-            .map(|el| {
+            .map(|(el, item)| {
                 (
-                    el,
                     el.angle - el.half_beam_width,
                     el.angle + el.half_beam_width,
+                    item,
                 )
             })
             .peekable();
         let mut vec = Vec::new();
         let mut boundary = None;
 
-        while let Some((el, start, end)) = iter.next() {
+        while let Some((start, end, item)) = iter.next() {
             let start = boundary.unwrap_or(start);
-            let end = if let Some((_, next_start, _)) = iter.peek() {
+            let end = if let Some((next_start, _, _)) = iter.peek() {
                 if end < *next_start {
                     boundary = None;
                     end
@@ -285,10 +285,10 @@ impl ElevationRanges {
             } else {
                 end
             };
-            vec.push((start..end, Some(el.clone())));
+            vec.push((start..end, Some(item)));
 
             if boundary.is_none() {
-                if let Some((_, next_start, _)) = iter.peek() {
+                if let Some((next_start, _, _)) = iter.peek() {
                     vec.push((end..*next_start, None));
                 }
             }
@@ -401,20 +401,19 @@ mod tests {
     test_elevation_ranges! {
         (
             elevation_ranges_for_nonoverlapping_elevations,
-            vec![PpiElevationSpecInDegrees::new(2., 1.), PpiElevationSpecInDegrees::new(5., 1.)],
             vec![
-                (1.0..3.0, Some(PpiElevationSpecInDegrees::new(2., 1.))),
-                (3.0..4.0, None),
-                (4.0..6.0, Some(PpiElevationSpecInDegrees::new(5., 1.))),
-            ]
+                (PpiElevationSpecInDegrees::new(2., 1.), 2),
+                (PpiElevationSpecInDegrees::new(5., 1.), 5),
+            ],
+            vec![(1.0..3.0, Some(&2)), (3.0..4.0, None), (4.0..6.0, Some(&5))]
         ),
         (
             elevation_ranges_for_overlapping_elevations,
-            vec![PpiElevationSpecInDegrees::new(2., 2.), PpiElevationSpecInDegrees::new(5., 2.)],
             vec![
-                (0.0..3.5, Some(PpiElevationSpecInDegrees::new(2., 2.))),
-                (3.5..7.0, Some(PpiElevationSpecInDegrees::new(5., 2.))),
-            ]
+                (PpiElevationSpecInDegrees::new(2., 2.), 2),
+                (PpiElevationSpecInDegrees::new(5., 2.), 5),
+            ],
+            vec![(0.0..3.5, Some(&2)), (3.5..7.0, Some(&5))]
         ),
     }
 }

@@ -3,9 +3,9 @@ use std::{ops::Range, vec::IntoIter};
 use itertools::Itertools;
 
 use crate::{
-    calc_distance_and_direction, AxisTransformation, LatLonInDegrees, LatLonInRadians,
-    PpiElevationSpecInDegrees, RadarCenteredPoint, RadarObsCell, RadarObsCellVertical, RadarSite,
-    Xyz, HALF_PI, TWO_PI,
+    calc_distance_and_direction, calc_r_and_z_from_s_and_el, AxisTransformation, LatLonInDegrees,
+    LatLonInRadians, PpiElevationSpecInDegrees, RadarCenteredPoint, RadarObsCell,
+    RadarObsCellVertical, RadarSite, Xyz, HALF_PI, TWO_PI,
 };
 
 #[derive(Debug, PartialEq)]
@@ -295,6 +295,29 @@ impl<'p, T> ElevationRanges<'p, T> {
         }
 
         Self(vec)
+    }
+
+    pub fn z_ranges(&self, s_meter: f64, site: &RadarSite) -> ZRanges<'p, T> {
+        let vec = self
+            .0
+            .iter()
+            .map(|(range, item)| {
+                let (_, z_start) = calc_r_and_z_from_s_and_el(s_meter, range.start, site);
+                let (_, z_end) = calc_r_and_z_from_s_and_el(s_meter, range.end, site);
+                let z_range = z_start..z_end;
+                (z_range, *item)
+            })
+            .collect();
+        ZRanges(vec)
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct ZRanges<'p, T>(Vec<(Range<f64>, Option<&'p T>)>);
+
+impl<'p, T> ZRanges<'p, T> {
+    pub fn find(&self, z_meter: &f64) -> Option<&(Range<f64>, Option<&'p T>)> {
+        self.0.iter().find(|(range, _)| range.contains(z_meter))
     }
 }
 

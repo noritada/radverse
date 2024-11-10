@@ -5,7 +5,7 @@ pub struct Ppi<'v> {
     values: &'v [f64],
     range: RangeGateSpecInMeter,
     az: Azimuth,
-    el: PpiElevationSpecInDegrees,
+    pub(crate) el: PpiElevationSpecInDegrees,
 }
 
 impl<'v> Ppi<'v> {

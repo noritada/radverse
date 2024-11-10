@@ -4,15 +4,14 @@ use itertools::Itertools;
 
 use crate::{
     calc_distance_and_direction, calc_r_and_z_from_s_and_el, AxisTransformation, LatLonInDegrees,
-    LatLonInRadians, PpiElevationSpecInDegrees, RadarCenteredPoint, RadarObsCell,
-    RadarObsCellVertical, RadarSite, Xyz, HALF_PI, TWO_PI,
+    LatLonInRadians, PpiElevationSpecInDegrees, RadarSite, Xyz, HALF_PI, TWO_PI,
 };
 
 #[derive(Debug, PartialEq)]
 pub struct VerticalCrossSection {
     pub path_points: Vec<VerticalCrossSectionHorizontalPoint>,
     v_axis: VerticalCrossSectionVerticalAxis,
-    site: RadarSite,
+    pub(crate) site: RadarSite,
     pub shape: (usize, usize),
     pub max_distance_meter: f64,
     pub max_alt_km: u8,
@@ -50,21 +49,15 @@ impl VerticalCrossSection {
         })
     }
 
-    pub fn cells(&self) -> Vec<RadarObsCell> {
+    pub(crate) fn horizontal_iter(
+        &self,
+    ) -> impl Iterator<Item = &VerticalCrossSectionHorizontalPoint> {
+        self.path_points.iter()
+    }
+
+    pub fn vertical_iter(&self) -> impl Iterator<Item = &f64> {
         let VerticalCrossSectionVerticalAxis(ref v_cells) = self.v_axis;
-        v_cells
-            .iter()
-            .cartesian_product(self.path_points.iter())
-            .map(|(&alt_meter, point)| {
-                let cell = RadarCenteredPoint {
-                    alt_meter,
-                    dist_meter: point.site_distance,
-                };
-                let cell = RadarObsCellVertical::from((&cell, &self.site));
-                let az_deg = point.site_direction.to_degrees();
-                RadarObsCell::new(cell.r_meter, az_deg, cell.el_deg)
-            })
-            .collect()
+        v_cells.iter()
     }
 }
 

@@ -12,16 +12,16 @@ pub trait Render {
     fn render(&self) -> impl Iterator<Item = Self::Color>;
 }
 
-pub struct FixedElevationScanVerticalRenderer<'a, 'v> {
-    obs: &'a [Ppi<'v>],
+pub struct FixedElevationScanVerticalRenderer<'a> {
+    obs: &'a [Ppi],
     vcs: &'a VerticalCrossSection,
     color_map: &'a ListedColorMap,
     default_color: RgbColor,
 }
 
-impl<'a, 'v> FixedElevationScanVerticalRenderer<'a, 'v> {
+impl<'a> FixedElevationScanVerticalRenderer<'a> {
     pub fn new(
-        obs: &'a [Ppi<'v>],
+        obs: &'a [Ppi],
         vcs: &'a VerticalCrossSection,
         color_map: &'a ListedColorMap,
         default_color: RgbColor,
@@ -35,7 +35,7 @@ impl<'a, 'v> FixedElevationScanVerticalRenderer<'a, 'v> {
     }
 }
 
-impl<'a, 'v> Render for FixedElevationScanVerticalRenderer<'a, 'v> {
+impl<'a> Render for FixedElevationScanVerticalRenderer<'a> {
     type Color = RgbColor;
 
     fn render(&self) -> impl Iterator<Item = Self::Color> {

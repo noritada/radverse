@@ -1,16 +1,16 @@
 use crate::RadarObsCell;
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct Ppi<'v> {
-    values: &'v [f64],
+pub struct Ppi {
+    values: Vec<f64>,
     range: RangeGateSpecInMeter,
     az: Azimuth,
     pub(crate) el: PpiElevationSpecInDegrees,
 }
 
-impl<'v> Ppi<'v> {
+impl Ppi {
     pub fn new(
-        values: &'v [f64],
+        values: Vec<f64>,
         range: RangeGateSpecInMeter,
         az: Azimuth,
         el: PpiElevationSpecInDegrees,

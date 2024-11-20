@@ -59,7 +59,7 @@ impl FromStr for RgbColor {
 }
 
 // Thresholds are assumed to be sorted.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct ListedColorMap(pub Vec<(f64, RgbColor)>);
 
 impl FromStr for ListedColorMap {

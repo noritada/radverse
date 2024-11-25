@@ -13,7 +13,7 @@ pub trait Render {
 }
 
 pub struct FixedElevationScanVerticalRenderer<'a> {
-    obs: &'a [Ppi],
+    ppis: &'a [Ppi],
     vcs: &'a VerticalCrossSection,
     color_map: &'a ListedColorMap,
     default_color: RgbColor,
@@ -21,13 +21,13 @@ pub struct FixedElevationScanVerticalRenderer<'a> {
 
 impl<'a> FixedElevationScanVerticalRenderer<'a> {
     pub fn new(
-        obs: &'a [Ppi],
+        ppis: &'a [Ppi],
         vcs: &'a VerticalCrossSection,
         color_map: &'a ListedColorMap,
         default_color: RgbColor,
     ) -> Self {
         Self {
-            obs,
+            ppis,
             vcs,
             color_map,
             default_color,
@@ -40,7 +40,7 @@ impl<'a> Render for FixedElevationScanVerticalRenderer<'a> {
 
     fn render(&self) -> impl Iterator<Item = Self::Color> {
         let el_sorted = self
-            .obs
+            .ppis
             .iter()
             .map(|ppi| (ppi.el.clone(), ppi))
             .collect::<Vec<_>>();

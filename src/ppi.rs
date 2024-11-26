@@ -2,10 +2,10 @@ use crate::RadarObsCell;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Ppi {
-    values: Vec<f64>,
-    range: RangeGateSpecInMeter,
-    az: Azimuth,
-    pub(crate) el: PpiElevationSpecInDegrees,
+    pub values: Vec<f64>,
+    pub range: RangeGateSpecInMeter,
+    pub az: Azimuth,
+    pub el: PpiElevationSpecInDegrees,
 }
 
 impl Ppi {
@@ -93,6 +93,12 @@ impl Azimuth {
 pub struct PpiElevationSpecInDegrees {
     pub angle: f64,
     pub half_beam_width: f64,
+}
+
+impl PartialOrd for PpiElevationSpecInDegrees {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.angle.partial_cmp(&other.angle)
+    }
 }
 
 impl PpiElevationSpecInDegrees {

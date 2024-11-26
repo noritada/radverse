@@ -314,6 +314,15 @@ impl<'p, T> ZRanges<'p, T> {
     }
 }
 
+impl<'p, 'i, T> IntoIterator for &'i ZRanges<'p, T> {
+    type Item = &'i (Range<f64>, Option<&'p T>);
+    type IntoIter = std::slice::Iter<'i, (Range<f64>, Option<&'p T>)>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
